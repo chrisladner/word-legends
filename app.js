@@ -13,7 +13,8 @@ const LEGEND_INTERVAL = 60;                  // Legendär und wieder richtig →
 const TIER_LABEL = ['Neu', 'Stufe 1', 'Stufe 2', 'Stufe 3', 'Stufe 4', 'Stufe 5', 'Legendär'];
 const TIER_SHORT = ['Neu', '1', '2', '3', '4', '5', '👑'];
 const XP = { type: 10, memo: 5, mc: 5, intro: 5, noTo: 8, hint: 4, typo: 3, levelUp: 5, combo: 10, mission: 20 };
-const TITLES = [[1, 'Rookie'], [3, 'Wortjäger'], [5, 'Vokabel-Profi'], [8, 'Sprach-Ninja'], [12, 'Word Legend']];
+const OLD_PER_DAY = 6;   // so viele Karten aus älteren Units werden pro Tag höchstens eingestreut
+const TITLES = [[1, 'Rookie'], [4, 'Wortjäger'], [8, 'Vokabel-Profi'], [14, 'Sprach-Ninja'], [22, 'Word Legend']];
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -21,10 +22,11 @@ const app = $('#app');
 // ================================================================
 // Wörter vorbereiten
 // ================================================================
+const UNITS = window.UNITS || [];
 const WORDS = [];
 const BY_ID = Object.create(null);
 const APART = Object.create(null);   // id → ids, die nicht am selben Tag neu kommen sollen
-for (const unit of window.UNITS || []) {
+for (const unit of UNITS) {
   for (const w of unit.words) {
     w.unit = unit.id;
     prep(w);
@@ -169,7 +171,7 @@ function inDays(n) {
 function fresh() {
   return {
     v: 1,
-    settings: { name: '', newPerDay: 8, testDate: '', strictTo: true, autoSpeak: true, sfx: true },
+    settings: { name: '', newPerDay: 8, testDate: '', strictTo: true, autoSpeak: true, sfx: true, focus: 'auto' },
     w: {},
     stats: { xp: 0, streak: 0, best: 0, lastDay: '', answers: 0, right: 0, sessions: 0 },
     day: { date: '', newCount: 0 },
@@ -206,33 +208,62 @@ function save() {
 // ================================================================
 // Karteikasten-Logik
 // ================================================================
-// Mit Testdatum: keine Karte darf erst nach dem Tag vor dem Test fällig werden
-function effDue(st) {
-  const t = S.settings.testDate, now = today();
-  if (t && daysBetween(now, t) >= 1) {
+// Schwerpunkt-Unit: bekommt die neuen Wörter zuerst, alle Wiederholungen und das Testdatum.
+// Ältere Units werden nur eingestreut. null = alle Units gleich (nur eine Unit, oder so eingestellt).
+function focusUnit() {
+  const f = S.settings.focus;
+  if (UNITS.length < 2 || f === 'all') return null;
+  if (f && f !== 'auto' && UNITS.some(u => u.id === f)) return f;
+  return UNITS[UNITS.length - 1].id;
+}
+function inFocus(w) { const f = focusUnit(); return !f || w.unit === f; }
+function unitTitle(id) { const u = UNITS.find(x => x.id === id); return u ? u.title : id; }
+function unitIndex(w) { return UNITS.findIndex(u => u.id === w.unit); }
+
+// Mit Testdatum: keine Karte der Schwerpunkt-Unit wird erst nach dem Tag vor dem Test fällig
+function effDue(w) {
+  const st = S.w[w.id], t = S.settings.testDate;
+  if (t && inFocus(w) && daysBetween(today(), t) >= 1) {
     const cap = addDays(t, -1);
     return st.due < cap ? st.due : cap;
   }
   return st.due;
 }
 // Eine Karte ist "geladen", wenn ihre Pause vorbei ist – höchstens einmal pro Tag
-function isDue(st) { return !!st && st.lv >= 1 && st.last !== today() && effDue(st) <= today(); }
-function dueWords() { return WORDS.filter(w => isDue(S.w[w.id])); }
-function unseenWords() { return WORDS.filter(w => !S.w[w.id]).sort((a, b) => a.order - b.order); }
+function isDue(w) { const st = S.w[w.id]; return !!st && st.lv >= 1 && st.last !== today() && effDue(w) <= today(); }
+function dueWords() { return WORDS.filter(isDue); }
+// Für die Mission: alles Geladene aus der Schwerpunkt-Unit, aus älteren Units höchstens OLD_PER_DAY pro Tag
+function missionDue() {
+  const due = dueWords();
+  const f = focusUnit();
+  if (!f) return due;
+  const t = today();
+  const oldDone = WORDS.filter(w => w.unit !== f && S.w[w.id] && S.w[w.id].last === t && S.w[w.id].since !== t).length;
+  const old = due.filter(w => w.unit !== f)
+    .sort((a, b) => (effDue(a) < effDue(b) ? -1 : effDue(a) > effDue(b) ? 1 : S.w[a.id].lv - S.w[b.id].lv))
+    .slice(0, Math.max(0, OLD_PER_DAY - oldDone));
+  return due.filter(w => w.unit === f).concat(old);
+}
+// Neue Wörter: Schwerpunkt-Unit zuerst, danach ältere Units der Reihe nach
+function unseenWords() {
+  return WORDS.filter(w => !S.w[w.id])
+    .sort((a, b) => (inFocus(b) - inFocus(a)) || (unitIndex(a) - unitIndex(b)) || (a.order - b.order));
+}
 function collectedWords() { return WORDS.filter(w => S.w[w.id]); }
 function newToday() { return S.day.date === today() ? S.day.newCount : 0; }
 
 function newQuota() {
-  const unseen = unseenWords().length;
+  const unseen = unseenWords();
   const done = newToday();
   let per = S.settings.newPerDay;
   const t = S.settings.testDate;
   if (t) {
     const days = daysBetween(today(), t);
+    const forTest = unseen.filter(inFocus).length;
     // Alle neuen Wörter bis zwei Tage vor dem Test – der letzte Tag gehört der Wiederholung
-    if (days >= 1) per = Math.max(per, Math.ceil((unseen + done) / Math.max(1, days - 1)));
+    if (days >= 1 && forTest) per = Math.max(per, Math.ceil((forTest + done) / Math.max(1, days - 1)));
   }
-  return Math.max(0, Math.min(unseen, per - done));
+  return Math.max(0, Math.min(unseen.length, per - done));
 }
 
 // Die nächsten neuen Wörter – ohne Gegensatzpaare am selben Tag.
@@ -327,7 +358,7 @@ function reviewType(w, lv) {
 }
 
 function buildMission(newCount) {
-  const reviews = shuffle(dueWords()).map(w => ({ id: w.id, type: reviewType(w, S.w[w.id].lv), scored: true }));
+  const reviews = shuffle(missionDue()).map(w => ({ id: w.id, type: reviewType(w, S.w[w.id].lv), scored: true }));
   const intros = pickNew(newCount).map(w => ({ id: w.id, type: 'intro' }));
   const q = [];
   let r = 0, n = 0;
@@ -345,7 +376,10 @@ function hardestIds(n) {
     .sort((a, b) => (S.w[a.id].lv - S.w[b.id].lv) || (score(S.w[b.id]) - score(S.w[a.id])))
     .slice(0, n).map(w => w.id);
 }
-function buildTest(n) { return shuffle(collectedWords()).slice(0, n).map(w => ({ id: w.id, type: 'test' })); }
+function buildTest(n, sel) {
+  const pool = collectedWords().filter(w => !sel || sel === 'all' || w.unit === sel);
+  return shuffle(pool).slice(0, n).map(w => ({ id: w.id, type: 'test' }));
+}
 
 function distractors(w, k) {
   const same = shuffle(WORDS.filter(o => o !== w && o.verb === w.verb && o.de !== w.de));
@@ -445,10 +479,11 @@ function clozeHTML(w) { return esc(w.ex).replace(/\[([^\]]+)\]/, (_, g) => `<spa
 function sayBtn(w, cls = '') {
   return TTS.ok ? `<button class="say keepfocus ${cls}" type="button" data-act="say" data-say="${esc(w.say)}" aria-label="Vorlesen">🔊</button>` : '';
 }
-function tierBand(lv, right) {
+// tag: kleiner Hinweis im Band, z. B. "Unit 1" bei eingestreuten Karten aus älteren Units
+function tierBand(lv, right, tag) {
   const cls = lv === 6 ? 'band holo' : 'band';
   const stars = lv >= 1 && lv <= 5 ? '★'.repeat(lv) + '<span class="dim">' + '★'.repeat(5 - lv) + '</span>' : (lv === 6 ? '👑' : '');
-  return `<div class="${cls}" style="--tier:var(--t${lv})"><span>${TIER_LABEL[lv]}</span><span>${right || stars}</span></div>`;
+  return `<div class="${cls}" style="--tier:var(--t${lv})"><span>${TIER_LABEL[lv]}${tag ? `<em class="utag">${esc(tag)}</em>` : ''}</span><span>${right || stars}</span></div>`;
 }
 function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 function shake(el) { restartAnim(el, 'shake'); }
@@ -596,39 +631,45 @@ function home() {
   SES = null;
   document.body.classList.remove('in-session');
   refreshStreak();
-  const due = dueWords();
+  const due = missionDue();
   const quota = pickNew(newQuota()).length;
   const counts = tierCounts();
   const collected = WORDS.length - counts[0];
   const L = levelInfo(S.stats.xp);
   const streak = S.stats.streak;
   const name = S.settings.name;
+  const focus = focusUnit();
+  const eyebrow = `Heute${focus ? ` · Schwerpunkt ${esc(unitTitle(focus))}` : ''}`;
 
   let mission;
   if (due.length || quota) {
     const mins = Math.max(1, Math.round((due.length * 15 + quota * 45) / 60));
+    const oldN = due.filter(w => !inFocus(w)).length;
     let line;
     if (due.length && quota) line = `<b>${due.length}</b> ${due.length === 1 ? 'Karte ist' : 'Karten sind'} geladen, <b>${quota}</b> neue ${quota === 1 ? 'wartet' : 'warten'}.`;
     else if (due.length) line = `<b>${due.length}</b> ${due.length === 1 ? 'Karte ist' : 'Karten sind'} geladen.`;
     else line = collected ? `<b>${quota}</b> neue ${quota === 1 ? 'Karte wartet' : 'Karten warten'} auf dich.` : `Deine ersten <b>${quota}</b> Karten warten auf dich.`;
     mission = `
-      <div class="eyebrow">Heute</div>
+      <div class="eyebrow">${eyebrow}</div>
       ${handHTML(due, quota)}
       <p class="mission-line">${line}</p>
-      <p class="mission-time">ca. ${mins} ${mins === 1 ? 'Minute' : 'Minuten'}</p>
+      <p class="mission-time">ca. ${mins} ${mins === 1 ? 'Minute' : 'Minuten'}${oldN ? ` · ${oldN} ${oldN === 1 ? 'Karte' : 'Karten'} aus älteren Units` : ''}</p>
       <button class="btn go big" type="button" data-act="start">Start</button>`;
   } else {
     const tomorrow = addDays(today(), 1);
-    const nTomorrow = collectedWords().filter(w => effDue(S.w[w.id]) <= tomorrow).length;
+    const dueTomorrow = collectedWords().filter(w => effDue(w) <= tomorrow);
+    const nTomorrow = focus
+      ? dueTomorrow.filter(w => w.unit === focus).length + Math.min(OLD_PER_DAY, dueTomorrow.filter(w => w.unit !== focus).length)
+      : dueTomorrow.length;
     const extra = pickNew(5).length;
     let next = '';
     if (nTomorrow) next = `Morgen ${nTomorrow === 1 ? 'ist' : 'sind'} <b>${nTomorrow}</b> ${nTomorrow === 1 ? 'Karte' : 'Karten'} wieder geladen.`;
     else if (collected) {
-      const soon = collectedWords().map(w => effDue(S.w[w.id])).sort()[0];
+      const soon = collectedWords().map(effDue).sort()[0];
       next = `Die nächste Karte ist ${inDays(daysBetween(today(), soon))} wieder geladen.`;
     }
     mission = `
-      <div class="eyebrow">Heute</div>
+      <div class="eyebrow">${eyebrow}</div>
       <p class="mission-done">Mission geschafft ✓</p>
       <p class="mission-line">${next}</p>
       <div class="two">
@@ -666,6 +707,12 @@ function home() {
     <div class="shelf">
       <div class="shelf-head"><h2>Deine Sammlung</h2><span>${collected} von ${WORDS.length}</span></div>
       <div class="stacks">${counts.map((c, lv) => stackHTML(lv, c)).join('')}</div>
+      ${UNITS.length > 1 ? `<div class="unitline">${UNITS.slice().reverse().map(u => {
+        const ws = WORDS.filter(w => w.unit === u.id);
+        const got = ws.filter(w => S.w[w.id]).length;
+        const legend = ws.filter(w => S.w[w.id] && S.w[w.id].lv === 6).length;
+        return `<span class="${u.id === focus ? 'on' : ''}">${esc(u.title)} ${legend === ws.length ? '👑' : `${got}/${ws.length}`}</span>`;
+      }).join('')}</div>` : ''}
     </div>
     <div class="two">
       <button class="btn" type="button" data-act="test">📝 Probetest</button>
@@ -696,51 +743,62 @@ function stackHTML(lv, c) {
 function cardState(w) {
   const st = S.w[w.id];
   if (!st) return 'noch nicht gesammelt';
-  if (isDue(st)) return '⚡ geladen';
-  if (st.last === today() && effDue(st) <= today()) return 'heute schon geübt';
-  return `lädt · ${inDays(daysBetween(today(), effDue(st)))}`;
+  if (isDue(w)) return '⚡ geladen';
+  if (st.last === today() && effDue(w) <= today()) return 'heute schon geübt';
+  return `lädt · ${inDays(daysBetween(today(), effDue(w)))}`;
 }
 
 function cards(filter = 'all') {
   screen = 'cards';
   stopFx();
+  const f = String(filter);
+  const unitSel = f.startsWith('u:') ? f.slice(2) : null;
   let list = WORDS.slice();
-  if (filter === 'due') list = list.filter(w => isDue(S.w[w.id]));
-  else if (filter === 'hard') list = list.filter(w => S.w[w.id] && S.w[w.id].bad >= 2).sort((a, b) => S.w[b.id].bad - S.w[a.id].bad);
-  else if (/^\d$/.test(String(filter))) list = list.filter(w => (S.w[w.id] ? S.w[w.id].lv : 0) === +filter);
+  if (f === 'due') list = list.filter(isDue);
+  else if (f === 'hard') list = list.filter(w => S.w[w.id] && S.w[w.id].bad >= 2).sort((a, b) => S.w[b.id].bad - S.w[a.id].bad);
+  else if (/^\d$/.test(f)) list = list.filter(w => (S.w[w.id] ? S.w[w.id].lv : 0) === +f);
+  else if (unitSel) list = list.filter(w => w.unit === unitSel);
 
-  const chip = (f, label) => `<button class="chipbtn ${String(filter) === f ? 'on' : ''}" type="button" data-act="filter" data-f="${f}">${label}</button>`;
-  const levelChip = /^\d$/.test(String(filter)) ? chip(String(filter), TIER_LABEL[+filter]) : '';
+  const chip = (v, label) => `<button class="chipbtn ${f === v ? 'on' : ''}" type="button" data-act="filter" data-f="${v}">${label}</button>`;
+  const levelChip = /^\d$/.test(f) ? chip(f, TIER_LABEL[+f]) : '';
+  const unitChips = UNITS.length > 1 ? UNITS.slice().reverse().map(u => chip('u:' + u.id, esc(u.title))).join('') : '';
+  const multi = UNITS.length > 1;
 
   let body = '';
   if (!list.length) {
-    body = `<p class="empty-note">${filter === 'due' ? 'Gerade ist keine Karte geladen. Schau morgen wieder rein!' : filter === 'hard' ? 'Keine schwierigen Karten – stark!' : 'Hier ist noch keine Karte.'}</p>`;
-  } else if (filter === 'all') {
-    const groups = [];
-    for (const w of list) {
-      const g = groups[groups.length - 1];
-      if (g && g.sec === w.sec && g.unit === w.unit) g.words.push(w);
-      else groups.push({ sec: w.sec, unit: w.unit, words: [w] });
-    }
-    body = groups.map(g => `
-      <div class="group-head"><span class="secdot">${g.sec ? esc(g.sec) : '•'}</span>${g.sec ? (/^\d+$/.test(g.sec) ? 'Übung ' + esc(g.sec) : esc(g.sec)) : 'Einstieg'}</div>
-      <div class="grid">${g.words.map(miniCardBtn).join('')}</div>`).join('');
+    body = `<p class="empty-note">${f === 'due' ? 'Gerade ist keine Karte geladen. Schau morgen wieder rein!' : f === 'hard' ? 'Keine schwierigen Karten – stark!' : 'Hier ist noch keine Karte.'}</p>`;
+  } else if (f === 'all' || unitSel) {
+    // Nach Units (neueste zuerst) und darin nach Übungsnummern wie im Buch
+    body = UNITS.slice().reverse().map(u => {
+      const ws = list.filter(w => w.unit === u.id);
+      if (!ws.length) return '';
+      const groups = [];
+      for (const w of ws) {
+        const g = groups[groups.length - 1];
+        if (g && g.sec === w.sec) g.words.push(w);
+        else groups.push({ sec: w.sec, words: [w] });
+      }
+      const head = multi ? `<h2 class="unit-head outline">${esc(u.title)} <small>${esc(u.source || '')}</small></h2>` : '';
+      return head + groups.map(g => `
+        <div class="group-head"><span class="secdot">${g.sec ? esc(g.sec) : '•'}</span>${g.sec ? (/^\d+$/.test(g.sec) ? 'Übung ' + esc(g.sec) : esc(g.sec)) : 'Einstieg'}</div>
+        <div class="grid">${g.words.map(w => miniCardBtn(w)).join('')}</div>`).join('');
+    }).join('');
   } else {
-    body = `<div class="grid">${list.map(miniCardBtn).join('')}</div>`;
+    body = `<div class="grid">${list.map(w => miniCardBtn(w, multi)).join('')}</div>`;
   }
 
   app.innerHTML = `
   <section class="screen cards">
     ${topbar('Karten')}
-    <div class="chips">${chip('all', 'Alle')}${chip('due', '⚡ Geladen')}${chip('hard', 'Schwierig')}${levelChip}</div>
+    <div class="chips">${chip('all', 'Alle')}${chip('due', '⚡ Geladen')}${chip('hard', 'Schwierig')}${unitChips}${levelChip}</div>
     ${body}
   </section>`;
 }
 
-function miniCardBtn(w) {
+function miniCardBtn(w, showUnit) {
   const st = S.w[w.id], lv = st ? st.lv : 0;
   return `<button class="mcard ${lv ? '' : 'unseen'}" type="button" data-act="card" data-id="${w.id}" style="--tier:var(--t${lv})">
-    <span class="mband ${lv === 6 ? 'holo' : ''}">${lv ? (lv === 6 ? '👑 Legendär' : 'Stufe ' + lv) : 'Neu'}</span>
+    <span class="mband ${lv === 6 ? 'holo' : ''}">${lv ? (lv === 6 ? '👑 Legendär' : 'Stufe ' + lv) : 'Neu'}${showUnit ? ` · ${esc(unitTitle(w.unit))}` : ''}</span>
     <b class="men">${esc(w.en)}</b>
     <span class="mde">${esc(w.de)}</span>
     <span class="mstate">${cardState(w)}</span>
@@ -765,23 +823,29 @@ function cardDetail(id) {
 }
 
 // ---------- Probetest ----------
-function testSetup() {
+// sel: Unit-id oder 'all'. Standard ist die Schwerpunkt-Unit – da kommt ja der nächste Test.
+function testSetup(sel) {
   screen = 'test';
   stopFx();
-  const n = collectedWords().length;
+  const multi = UNITS.length > 1;
+  sel = sel || (multi && focusUnit()) || 'all';
+  const n = collectedWords().filter(w => sel === 'all' || w.unit === sel).length;
+  const unitChips = multi ? `<div class="chips">${UNITS.slice().reverse().map(u =>
+    `<button class="chipbtn ${sel === u.id ? 'on' : ''}" type="button" data-act="testUnit" data-sel="${u.id}">${esc(u.title)}</button>`).join('')}
+    <button class="chipbtn ${sel === 'all' ? 'on' : ''}" type="button" data-act="testUnit" data-sel="all">Alle Units</button></div>` : '';
   let body;
   if (n < 5) {
-    body = `<div class="panel"><p>Sammle zuerst mindestens <b>5 Karten</b>, dann kannst du dich testen.</p>
+    body = `<div class="panel"><p>Sammle zuerst mindestens <b>5 Karten</b>${multi && sel !== 'all' ? ` aus ${esc(unitTitle(sel))}` : ''}, dann kannst du dich testen.</p>
       <button class="btn go big" type="button" data-act="home">Zur Mission</button></div>`;
   } else {
     const sizes = [...new Set([10, 20, n].filter(k => k <= n))];
     body = `<div class="panel">
       <p class="lead dark">Wie in der Schule: Du siehst das deutsche Wort und schreibst es auf Englisch. Keine Tipps. Die Note gibt’s am Ende.</p>
       <p class="fineprint">Halbe Punkte für einen Tippfehler${S.settings.strictTo ? ' oder ein fehlendes „to“' : ''}. Nur Karten, die du schon gesammelt hast (${n}).</p>
-      <div class="sizes">${sizes.map(k => `<button class="btn ${k === Math.min(20, n) ? 'go' : ''}" type="button" data-act="testGo" data-n="${k}">${k === n ? `Alle ${k}` : `${k} Wörter`}</button>`).join('')}</div>
+      <div class="sizes">${sizes.map(k => `<button class="btn ${k === Math.min(20, n) ? 'go' : ''}" type="button" data-act="testGo" data-n="${k}" data-sel="${sel}">${k === n ? `Alle ${k}` : `${k} Wörter`}</button>`).join('')}</div>
     </div>`;
   }
-  app.innerHTML = `<section class="screen">${topbar('Probetest')}${body}</section>`;
+  app.innerHTML = `<section class="screen">${topbar('Probetest')}${unitChips}${body}</section>`;
 }
 
 function gradeOf(pct) {
@@ -845,6 +909,13 @@ function settings() {
       <div class="field"><b>Neue Wörter pro Tag</b>
         <div class="seg">${[5, 8, 12, 20].map(n => `<button type="button" class="${s.newPerDay === n ? 'on' : ''}" data-act="setNew" data-n="${n}">${n}</button>`).join('')}</div>
       </div>
+      ${UNITS.length > 1 ? `<label class="field"><b>Schwerpunkt</b>
+        <select id="set-focus">
+          <option value="auto" ${!s.focus || s.focus === 'auto' ? 'selected' : ''}>Neueste Unit (${esc(UNITS[UNITS.length - 1].title)})</option>
+          ${UNITS.slice().reverse().map(u => `<option value="${u.id}" ${s.focus === u.id ? 'selected' : ''}>${esc(u.title)}</option>`).join('')}
+          <option value="all" ${s.focus === 'all' ? 'selected' : ''}>Alle Units gleich</option>
+        </select>
+        <small>Aus dieser Unit kommen die neuen Wörter zuerst, und für sie gilt das Testdatum. Ältere Units werden mit höchstens ${OLD_PER_DAY} Karten pro Tag eingestreut. „Alle gleich“ passt, wenn eine Schularbeit mehrere Units abfragt.</small></label>` : ''}
       <label class="field"><b>Testdatum</b>
         <span class="daterow"><input id="set-test" type="date" value="${esc(s.testDate)}">${s.testDate ? '<button class="link" type="button" data-act="clearTest">löschen</button>' : ''}</span>
         <small>Mit Datum verteilt die App alle neuen Wörter rechtzeitig und holt am Tag vor dem Test jede Karte noch einmal heraus.</small></label>
@@ -863,6 +934,8 @@ function settings() {
   </section>`;
 
   $('#set-name').addEventListener('change', e => { S.settings.name = e.target.value.trim().slice(0, 20); save(); });
+  const focusSel = $('#set-focus');
+  if (focusSel) focusSel.addEventListener('change', e => { S.settings.focus = e.target.value; save(); toast('Schwerpunkt gespeichert.'); });
   $('#set-test').addEventListener('change', e => {
     const v = e.target.value;
     if (v && daysBetween(today(), v) < 0) { toast('Das Datum liegt in der Vergangenheit.'); e.target.value = S.settings.testDate; return; }
@@ -903,6 +976,7 @@ function about() {
       <p><b>Kontext und Aussprache.</b> Die Beispielsätze aus dem Buch werden zu Lückensätzen, dazu britische Aussprache und ab Stufe 3 Hördiktate.</p>
       <p><b>Kleine Portionen.</b> Standardmäßig 8 neue Wörter pro Tag, gemischt mit Wiederholungen. Gegensatzpaare wie open/close und leicht verwechselbare Wörter wie their/your/our kommen nie am selben Tag neu dazu.</p>
       <p><b>Testdatum.</b> In den Einstellungen eintragen: Dann kommen alle neuen Wörter rechtzeitig dran, und am Tag vor dem Test wird jede Karte noch einmal abgefragt.</p>
+      <p><b>Neue Units.</b> Die neueste Unit hat Vorrang: Ihre Wörter kommen zuerst, und das Testdatum gilt für sie. Ältere Units laufen im Hintergrund weiter. Ihre Karten kommen in immer längeren Abständen wieder, höchstens ${OLD_PER_DAY} pro Tag, damit nichts vergessen wird und die Runde trotzdem kurz bleibt.</p>
     </div>
   </section>`;
 }
@@ -1035,7 +1109,7 @@ function showTask() {
   E.input.placeholder = 'auf Englisch …';
   E.main.textContent = t.type === 'test' ? 'Weiter' : 'Prüfen';
 
-  let chip = '', band = tierBand(lv), body = '', kind = 'type';
+  let chip = '', band = tierBand(lv, null, inFocus(w) ? '' : unitTitle(w.unit)), body = '', kind = 'type';
   switch (t.type) {
     case 'intro':
       chip = 'Schau dir die Schreibweise genau an';
@@ -1208,7 +1282,7 @@ function feedback(res, info, sched, xp) {
   if (t.type !== 'cloze' && w.exPlain) body += `<p class="ex">${exHTML(w)}</p>`;
   if (w.tip) body += `<p class="tip">💡 ${esc(w.tip)}</p>`;
   if (sched) {
-    const d = inDays(daysBetween(today(), effDue(S.w[t.id])));
+    const d = inDays(daysBetween(today(), effDue(w)));
     if (sched.to > sched.from) body += `<p class="sched up">${sched.to === 6 ? '👑 Legendär!' : `▲ Stufe ${sched.to}!`} Wieder geladen ${d}.</p>`;
     else if (sched.to < sched.from) body += `<p class="sched down">▼ Zurück auf Stufe ${sched.to} – kommt ${d} wieder.</p>`;
     else if (!good || res === 'hint') body += `<p class="sched">Bleibt auf Stufe ${sched.to} – kommt ${d} wieder.</p>`;
@@ -1314,7 +1388,7 @@ function finish() {
   SES = null;
   document.body.classList.remove('in-session');
   if (s.mode === 'test') { markDay(); S.stats.sessions++; save(); return testResult(s); }
-  if (s.mode === 'mission' && !dueWords().length && !pickNew(newQuota()).length) { S.stats.xp += XP.mission; s.xp += XP.mission; }
+  if (s.mode === 'mission' && !missionDue().length && !pickNew(newQuota()).length) { S.stats.xp += XP.mission; s.xp += XP.mission; }
   const streakUp = markDay();
   S.stats.sessions++;
   save();
@@ -1381,7 +1455,8 @@ const ACT = {
   filter: b => cards(b.dataset.f),
   card: b => cardDetail(b.dataset.id),
   test: () => testSetup(),
-  testGo: b => startSession('test', buildTest(+b.dataset.n)),
+  testGo: b => startSession('test', buildTest(+b.dataset.n, b.dataset.sel)),
+  testUnit: b => testSetup(b.dataset.sel),
   settings: () => settings(),
   about: () => about(),
   next: () => onNext(),

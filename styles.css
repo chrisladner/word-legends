@@ -324,6 +324,9 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .stack.empty .cnt { opacity: .45; }
 .stack.empty em { background: transparent; border: 3px dashed rgba(255, 255, 255, .35); color: rgba(255, 255, 255, .55); text-shadow: none; animation: none; }
 .stack:active .pile { transform: translateY(2px); }
+.unitline { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 12px; }
+.unitline span { padding: 6px 10px 5px; border-radius: 999px; background: rgba(255, 255, 255, .14); font: 800 12.5px/1 var(--body); }
+.unitline span.on { background: var(--lime); color: var(--ink); }
 
 /* ---------- Willkommen ---------- */
 .welcome { justify-content: center; text-align: center; gap: 18px; }
@@ -381,7 +384,20 @@ input[type=text], input[type=date] {
   -webkit-appearance: none;
   appearance: none;
 }
-input[type=text]:focus, input[type=date]:focus { box-shadow: 0 0 0 4px var(--sun); }
+input[type=text]:focus, input[type=date]:focus, select:focus { box-shadow: 0 0 0 4px var(--sun); }
+select {
+  width: 100%;
+  min-height: 52px;
+  font: 700 18px/1.2 var(--body);
+  color: var(--ink);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23131849' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 16px center / 14px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  padding: 11px 42px 11px 14px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
 input::placeholder { color: #A0A6CF; opacity: 1; }
 
 /* ---------- Kartenübersicht ---------- */
@@ -398,6 +414,8 @@ input::placeholder { color: #A0A6CF; opacity: 1; }
   cursor: pointer;
 }
 .chipbtn.on { background: var(--lime); }
+.unit-head { margin: 12px 0 -4px; font-size: 30px; line-height: 1; }
+.unit-head small { display: block; margin-top: 7px; font: 700 13px/1.2 var(--body); letter-spacing: 0; color: rgba(255, 255, 255, .82); text-shadow: none; }
 .group-head {
   display: flex;
   align-items: center;
@@ -532,6 +550,17 @@ body.kb .session { padding-bottom: 10px; }
   color: var(--ink);
 }
 .band .dim { opacity: .28; }
+.utag {
+  margin-left: 8px;
+  padding: 3px 7px 2px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: .05em;
+  vertical-align: 1px;
+}
 .band.holo { background: var(--holo); background-size: 250% 100%; animation: holo 4s linear infinite; }
 .band.new { background: repeating-linear-gradient(-45deg, var(--sun) 0 12px, #FFE177 12px 24px); }
 .band.test { background: var(--ink); color: #fff; }

@@ -25,6 +25,7 @@ Läuft offline, sobald sie einmal geöffnet wurde.
 | Neue Wörter | Karte ansehen + anhören → verdeckt tippen → später Multiple Choice → später tippen |
 | Abfragearten | Stufe 1: tippen · Stufe 2: tippen/Lückensatz · ab 3: tippen/Lückensatz/Hördiktat |
 | Portionen | 8 neue pro Tag (einstellbar), `apart`-Gruppen (open/close …) nie am selben Tag |
+| Mehrere Units | neueste Unit hat Vorrang, ältere werden eingestreut (max. 6 pro Tag), siehe unten |
 | Testdatum | Neue Wörter werden bis 2 Tage vorher verteilt, am Tag vor dem Test sind alle Karten fällig |
 | Probetest | Deutsch → Englisch ohne Hilfe, halbe Punkte für Tippfehler / fehlendes „to“, Note 1–5 (90/80/65/50 %) |
 
@@ -33,8 +34,24 @@ Läuft offline, sobald sie einmal geöffnet wurde.
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `sw.js` → `VERSION` hochzählen (z. B. `wl-v2`) und neu veröffentlichen.
+Danach `sw.js` → `VERSION` hochzählen (z. B. `wl-v3`) und neu veröffentlichen.
 Auf dem iPhone ist die neue Version ab dem **zweiten** Öffnen da (erst Hintergrund-Update, dann aktiv).
+
+## Mehrere Units: Schwerpunkt + Einstreuen
+
+Keine Unit wird je „abgeschlossen“ – alle Karten bleiben im Kreislauf, nur die Abstände wachsen.
+Sobald es mehr als eine Unit gibt, gilt (Einstellungen → „Schwerpunkt“, Standard: neueste Unit):
+
+| | Schwerpunkt-Unit | Ältere Units |
+|---|---|---|
+| Neue Wörter | zuerst von hier | erst, wenn der Schwerpunkt ganz gesammelt ist |
+| Wiederholungen | alle fälligen | höchstens `OLD_PER_DAY` (6) pro Tag, überfälligste zuerst, gemischt in die Runde |
+| Testdatum | gilt (alles am Tag vorher) | gilt nicht |
+| Probetest | vorausgewählt | per Chip wählbar, oder „Alle Units“ |
+
+„Alle Units gleich“ schaltet den Vorrang ab, z. B. vor einer Schularbeit über mehrere Units.
+Mit nur einer Unit ist davon nichts sichtbar. Getestet mit einer erfundenen Unit 2 über 25 simulierte Tage:
+nie mehr als 6 alte Karten pro Tag, ein Rückstau von 20 fälligen Karten war nach etwa einer Woche abgebaut.
 
 ## Dateien
 

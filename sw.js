@@ -1,7 +1,7 @@
 /* Word Legends – Offline-Cache.
    App-Dateien: sofort aus dem Cache, im Hintergrund aktualisiert (neue Version ab dem nächsten Öffnen).
    Schrift von Google Fonts: einmal laden, dann aus dem Cache. */
-const VERSION = 'wl-v1';
+const VERSION = 'wl-v2';
 const FONT_CACHE = 'wl-fonts';
 const ASSETS = [
   './',
