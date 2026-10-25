@@ -1,7 +1,7 @@
 /* Word Legends – Offline-Cache.
    App-Dateien: sofort aus dem Cache, im Hintergrund aktualisiert (neue Version ab dem nächsten Öffnen).
    Schrift von Google Fonts: einmal laden, dann aus dem Cache. */
-const VERSION = 'wl-v3';
+const VERSION = 'wl-v4';
 const FONT_CACHE = 'wl-fonts';
 const ASSETS = [
   './',
@@ -19,7 +19,10 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' – frisch vom Server, nicht aus dem Browser-Zwischenspeicher (sonst können alte Dateien hängen bleiben)
+  event.waitUntil(caches.open(VERSION)
+    .then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -36,7 +39,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
-    const network = fetch(req).then(res => {
+    const network = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => {
       if (res.ok) {
         const copy = res.clone();
         caches.open(VERSION).then(c => c.put(req, copy));
