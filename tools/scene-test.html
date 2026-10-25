@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; padding: 10px; font: 600 12px system-ui; background: #2E3BD9; color: #fff; }
+  .g { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  figure { margin: 0; background: #fff; border-radius: 10px; padding: 4px; color: #131849; text-align: center; }
+  svg { width: 100%; height: auto; display: block; }
+  h3 { margin: 10px 0 4px; }
+</style></head>
+<body>
+<div id="out"></div>
+<script src="../scene.js"></script>
+<script>
+  const preps = ['in', 'on', 'under', 'next to', 'behind', 'in front of'];
+  const pairs = [['frog', 'shoe'], ['cat', 'box'], ['ball', 'chair'], ['monkey', 'tree'], ['book', 'bag'], ['penguin', 'stone']];
+  const only = new URLSearchParams(location.search).get('p');
+  document.getElementById('out').innerHTML = pairs.filter(([s, r]) => !only || only === r).map(([s, r]) =>
+    `<h3>${s} / ${r}</h3><div class="g">${preps.map(p => `<figure>${Scene.prep(s, r, p)}<figcaption>${p}</figcaption></figure>`).join('')}</div>`).join('');
+</script>
+</body></html>
