@@ -70,7 +70,7 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `sw.js` → `VERSION` hochzählen (Stand `wl-v3`) und neu veröffentlichen.
+Danach `sw.js` → `VERSION` hochzählen (Stand `wl-v4`) und neu veröffentlichen.
 Auf dem iPhone ist die neue Version ab dem **zweiten** Öffnen da (erst Hintergrund-Update, dann aktiv).
 
 ## Mehrere Units: Schwerpunkt + Einstreuen
