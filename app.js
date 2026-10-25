@@ -970,6 +970,7 @@ addEventListener('resize', syncViewport);
 // Screens
 // ================================================================
 let screen = '';
+let updateReady = false;   // neue Version im Hintergrund geladen – beim nächsten Mal auf der Startseite neu laden
 
 function topbar(title, back = 'home') {
   return `<header class="topbar">
@@ -1017,6 +1018,7 @@ function isStandalone() { return navigator.standalone === true || matchMedia('(d
 function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 
 function home() {
+  if (updateReady) { location.reload(); return; }
   screen = 'home';
   stopFx();
   SES = null;
@@ -1629,8 +1631,15 @@ function settings() {
       <div class="two"><button class="btn" type="button" data-act="exportCode">Code kopieren</button><button class="btn" type="button" data-act="importCode">Code einfügen</button></div>
     </div>
     <button class="btn danger big" type="button" data-act="reset">Fortschritt löschen</button>
-    <p class="fineprint center">Word Legends · ${WORDS.length} Wörter · ${window.UNITS.map(u => esc(u.title)).join(', ')}</p>
+    <p class="fineprint center">Word Legends · ${WORDS.length} Wörter · ${window.UNITS.map(u => esc(u.title)).join(', ')}<span id="set-ver"></span></p>
   </section>`;
+
+  // Version = Name des Offline-Caches (wl-v5 → „Version 5“), damit man am Handy sieht, ob ein Update angekommen ist
+  if (window.caches) caches.keys().then(keys => {
+    const v = keys.find(k => /^wl-v\d+$/.test(k));
+    const el = $('#set-ver');
+    if (v && el) el.textContent = ` · Version ${v.slice(4)}`;
+  }).catch(() => {});
 
   $('#set-name').addEventListener('change', e => { S.settings.name = e.target.value.trim().slice(0, 20); save(); });
   const focusSel = $('#set-focus');
@@ -2600,7 +2609,20 @@ if (S.ui.onboarded) home(); else welcome();
 // Offline-Cache nur auf der echten Seite – lokal beim Entwickeln stört er (mit ?sw trotzdem testen)
 const devHost = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !/[?&]sw\b/.test(location.search);
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !devHost) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  const sw = navigator.serviceWorker;
+  const hadController = !!sw.controller;
+  addEventListener('load', () => sw.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    // iOS holt Web-Apps oft nur aus dem Hintergrund zurück, ohne sie neu zu starten – dann selbst nach Updates schauen
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(() => {}));
+  // Neue Version übernommen: sofort neu laden, wenn man auf der Startseite ist – nie mitten in einer Runde
+  sw.addEventListener('controllerchange', () => {
+    if (!hadController) return;
+    updateReady = true;
+    if (screen === 'home') location.reload();
+  });
 }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 })();

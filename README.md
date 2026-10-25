@@ -70,8 +70,14 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `sw.js` → `VERSION` hochzählen (Stand `wl-v4`) und neu veröffentlichen.
-Auf dem iPhone ist die neue Version ab dem **zweiten** Öffnen da (erst Hintergrund-Update, dann aktiv).
+Danach `sw.js` → `VERSION` hochzählen (Stand `wl-v5`) und neu veröffentlichen.
+
+So kommt ein Update aufs iPhone (seit `wl-v5`): Mit Internet holt der Offline-Cache die App-Dateien
+immer frisch vom Server (höchstens 2,5 s warten, sonst Cache). Ein neuer `VERSION`-Stand wird beim Öffnen
+und beim Zurückholen aus dem Hintergrund gefunden; die App lädt dann von selbst neu, sobald man auf der
+Startseite ist, nie mitten in einer Runde. Kommt das Update von `wl-v1`…`wl-v4` (diese Seiten konnten
+sich noch nicht selbst neu laden), lädt der neue Offline-Cache das offene Fenster einmal neu (`LEGACY`).
+Welche Version am Handy läuft, steht unten in den Einstellungen („Version 5“).
 
 ## Mehrere Units: Schwerpunkt + Einstreuen
 
