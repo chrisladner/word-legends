@@ -1,7 +1,7 @@
 /* Word Legends – Offline-Cache.
    App-Dateien: mit Internet immer frisch vom Server (höchstens 2,5 s warten), ohne Internet aus dem Cache.
    Schrift von Google Fonts: einmal laden, dann aus dem Cache. */
-const VERSION = 'wl-v5';
+const VERSION = 'wl-v6';   // wie VERSION in app.js – immer beide zusammen hochzählen
 const FONT_CACHE = 'wl-fonts';
 const NET_WAIT = 2500;
 // Bis wl-v4 konnte sich die offene Seite nach einem Update nicht selbst neu laden
@@ -14,6 +14,8 @@ const ASSETS = [
   './grammar.js',
   './exam.js',
   './scene.js',
+  './legends-status.js',
+  './legends-sync.js',
   './app.js',
   './manifest.webmanifest',
   './icons/apple-touch-icon.png',
@@ -30,7 +32,8 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   const cleanup = (async () => {
-    const old = (await caches.keys()).filter(k => k !== VERSION && k !== FONT_CACHE);
+    // Nur eigene Caches: Geo Legends liegt auf derselben Adresse (chrisladner.github.io) und hat eigene.
+    const old = (await caches.keys()).filter(k => /^wl-/.test(k) && k !== VERSION && k !== FONT_CACHE);
     await Promise.all(old.map(k => caches.delete(k)));
     await self.clients.claim();
     return old.some(k => LEGACY.test(k));

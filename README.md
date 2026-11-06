@@ -27,7 +27,7 @@ einmal geöffnet wurde.
 | Abfragearten | Stufe 1: tippen · Stufe 2: tippen/Lückensatz · ab 3: tippen/Lückensatz/Hördiktat |
 | Portionen | 8 neue pro Tag (einstellbar), `apart`-Gruppen (open/close …) nie am selben Tag |
 | Mehrere Units | neueste Unit hat Vorrang, ältere werden eingestreut (max. 6 pro Tag), siehe unten |
-| Testdatum | Neue Wörter werden bis 2 Tage vorher verteilt, am Tag vor dem Test sind alle Karten fällig |
+| Testdatum | Neue Wörter werden bis 2 Tage vorher verteilt, am Tag vor dem Test sind alle Karten fällig. Der offizielle Termin (`exam.js`) geht vor und ist gesperrt; ein eigenes Datum gilt nur ohne offiziellen |
 | Probetest | Deutsch → Englisch ohne Hilfe, halbe Punkte für Tippfehler / fehlendes „to“, Note 1–5 (90/80/65/50 %) |
 
 ## Schularbeit (exam.js)
@@ -48,7 +48,9 @@ Simuliert (70 % der neuen Wörter schon bekannt, sonst 85 % richtig): ca. 9–17
 am Ende 93 % der Karten auf Stufe 3 oder höher.
 
 Nach dem Datum ist alles wieder normal (neueste Unit = Schwerpunkt). Für die nächste Schularbeit
-`exam.js` anpassen: Datum, Units, Abschnitte.
+`exam.js` anpassen: Datum, Units, Abschnitte, dazu `eingetragen: 'JJJJ-MM-TT'` (Tag des Eintrags, setzt `/stoff`).
+Dieser Termin gilt als „von Mama/Papa“: In den Einstellungen ist das Testdatum dann gesperrt, und ein
+früher selbst eingetragenes Datum zählt nicht, solange die Schularbeit ansteht.
 
 ## Grammatik (grammar.js)
 
@@ -70,14 +72,41 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `sw.js` → `VERSION` hochzählen (Stand `wl-v5`) und neu veröffentlichen.
+Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v6`; die Version steht auch im
+Lagebericht und in der Sicherung), und neu veröffentlichen.
 
 So kommt ein Update aufs iPhone (seit `wl-v5`): Mit Internet holt der Offline-Cache die App-Dateien
 immer frisch vom Server (höchstens 2,5 s warten, sonst Cache). Ein neuer `VERSION`-Stand wird beim Öffnen
 und beim Zurückholen aus dem Hintergrund gefunden; die App lädt dann von selbst neu, sobald man auf der
 Startseite ist, nie mitten in einer Runde. Kommt das Update von `wl-v1`…`wl-v4` (diese Seiten konnten
 sich noch nicht selbst neu laden), lädt der neue Offline-Cache das offene Fenster einmal neu (`LEGACY`).
-Welche Version am Handy läuft, steht unten in den Einstellungen („Version 5“).
+Welche Version am Handy läuft, steht unten in den Einstellungen („Version 6“).
+
+## Eltern-Verbindung und Plan-Karte (seit `wl-v6`)
+
+Anbindung an Legends HQ (Eltern-Hub). Vertrag: `apps/legends-hq/docs/schnittstelle.md`, fachlich
+`auftraege/2026-11-06_eltern-hub.md`. Die Bausteine `legends-status.js` und `legends-sync.js` sind Kopien aus
+`apps/legends-hq/shared/` – **hier nie von Hand ändern**, sondern dort ändern und `node tools/verteilen.mjs`.
+
+| Teil | Umsetzung |
+|---|---|
+| Tagesprotokoll `S.log` | `{ 'JJJJ-MM-TT': { a, r, n, s, f, o, k } }`, in `fresh()` und `upgrade()`, beim Laden auf 90 Tage gekürzt. a/r = erste Versuche bei fälligen Karten (dort, wo `review()` läuft) und davon richtig · n = neu gesammelte Karten (`collect()`) · s = Sekunden vom Anzeigen bis zur Antwort, je Aufgabe höchstens 60 (auch Wiederholung in der Runde, Ausbessern, Regel lesen, Probetest, Generalprobe, Schreiben) · f/o/k setzt `LegendsStatus.bericht()` |
+| Lagebericht | `berichtEingabe()` → `LegendsStatus.bericht()`, danach `save()`. Ziel = in der Schularbeitszeit `EXAM.units`, sonst die Schwerpunkt-Unit, ohne Schwerpunkt alle Units. Je Karte Stufe, effektiv fällig (`effDue`), zuletzt, gesammelt seit (`since`), im Ziel, Bezeichnung, richtig/falsch. Regeln wie die Lernlogik: Pausen 1·2·4·7·14·30, Legendär 60, sicher ab Stufe 3, Fehler −2, Neue pro Tag = Einstellung + 6 Grammatik, Vorlauf 2 im Schularbeits-Modus sonst 1, Limit 55 Wiederholungen im Schularbeits-Modus sonst keins, Paket 1. Unter 2 KB, ohne Namen |
+| Plan je Termin `S.plaene` | in `fresh()` und `upgrade()`. `bericht()` friert beim ersten Bericht zu einem Termin ein, was der App-Plan ab dem Eintragetag bei täglichem Üben erreicht (Schlüssel `'<datum>\|<Stoffmenge>'`), und räumt vergangene Termine selbst weg. Die Ampel misst den Abstand dazu |
+| Plan-Karte | Startseite unter der Mission: `urteil(bericht, heute).kind` (Im Plan ✓ · Aufholen · Notfallplan), die letzten 6 Tage plus heute als Punkte (✓ fertig, halb = geübt, gestrichelt = nicht geübt, hell = nichts fällig, Ring = heute offen), darunter „Das sehen Mama und Papa auch.“ Kein Rot, keine Minuten, keine XP. Rechnet auch ohne Verbindung. Mit Testdatum braucht die Prognose bis zu ein paar Zehntelsekunden: Das Ergebnis wird je Tag und Speicherstand gemerkt, sonst erscheint die Startseite zuerst und die Karte kurz danach |
+| Termine | Offizieller Termin (`exam.js`, `quelle: 'eltern'`, `seit` = `EXAM.eingetragen`) geht immer vor, das Testdatum in den Einstellungen ist dann gesperrt („Termin von Mama/Papa“). Ein eigenes Datum (`quelle: 'selbst'`, `seit` = `settings.testSince`) gibt es nur ohne offiziellen. Ohne Eintragedatum bleibt `seit` weg; dann zählt der Tag, an dem die App den Termin zuerst sieht |
+| Einstellungen → Eltern-Verbindung | Verbindungs-Code (`HQ1:…`) einfügen → „Verbinden“ (prüft beim Server, dann gleich melden und sichern). Zustand „verbunden · gemeldet 18:02 · gesichert 18:02“, Fehler als Hinweis darunter. „Aus Sicherung holen“ holt zuerst, fragt dann mit Datum und Kartenzahl beider Stände nach und spielt den Stand über `upgrade()` ein. „Verbindung trennen“ mit Rückfrage. Der Code liegt in `localStorage['legends.sync.v1']`, nie im Sicherungs-Code der App |
+| Melden | nur mit Verbindung, nie blockierend, Fehler still: 1,5 s nach dem Start, beim Zurückholen aus dem Hintergrund (höchstens alle 10 Minuten), am Ende jeder Runde (auch beim Abbrechen, wenn schon geübt wurde) |
+| Sichern | am Ende jeder Runde: ganzer Speicherstand, im Browser verschlüsselt (AES-GCM, Schlüssel aus dem Familien-Code) |
+| Beim Verlassen der App | Tag ins Protokoll schreiben (fertig, offen, sicher), auch wenn die Startseite nicht mehr kommt |
+
+Ohne die beiden Bausteine (z. B. halbes Update ohne Netz) läuft die App wie bisher, nur ohne Plan-Karte und
+Verbindung.
+
+Konsole: `WL.bericht()` (frisch gerechneter Lagebericht) · `WL.urteil()` bzw. `WL.urteil({ abend: true })` ·
+`WL.eingabe()` · `WL.melden()` (melden und sichern, liefert den Zustand) · `WL.sync` (Verbindungszustand).
+Gegen den lokalen Server testen: `node tools/dev.mjs` in `apps/legends-hq` (Port 8787), den gedruckten
+Verbindungs-Code einfügen.
 
 ## Mehrere Units: Schwerpunkt + Einstreuen
 
@@ -103,6 +132,7 @@ nie mehr als 6 alte Karten pro Tag, ein Rückstau von 20 fälligen Karten war na
 - `grammar.js` – Grammatik-Themen mit Regeln und Übungskarten
 - `exam.js` – Schularbeit: Datum, Units, Abschnitte des Zettels, Mikes Mustertext
 - `scene.js` – Bilder: Präpositionen (Emoji), Zimmer und Federpennal (gezeichnet)
+- `legends-status.js`, `legends-sync.js` – Lagebericht, Ampel, Verbindung zu Legends HQ (Kopien aus `apps/legends-hq/shared/`)
 - `app.js` – Lernlogik + Oberfläche
 - `sw.js` – Offline-Cache
 - `manifest.webmanifest`, `icons/` – App-Icon (Quelle: `icons/icon-source.html`)
@@ -110,13 +140,16 @@ nie mehr als 6 alte Karten pro Tag, ein Rückstau von 20 fälligen Karten war na
 ## Lokal testen
 
 ```bash
-python3 word-legends/tools/devserver.py 8765
+# im Projektordner (oder über .claude/launch.json „word-legends“)
+python3 apps/word-legends/tools/devserver.py 8765
 ```
 
 Der Test-Server schickt keine Cache-Header, und auf localhost ist der Offline-Cache aus
 (mit `?sw` trotzdem testen). In der Browser-Konsole: `WL.shiftDays(1)` springt einen Tag weiter
 (nur in diesem Tab), `WL.check('u1-give', 'to giv')`, `WL.checkGram('pl-baby', 'babys')`,
-`WL.room(satz, fakten)` und `WL.meText(text)` prüfen Antworten, `WL.counts()` zeigt die Tagesmenge.
+`WL.room(satz, fakten)` und `WL.meText(text)` prüfen Antworten, `WL.counts()` zeigt die Tagesmenge,
+`WL.bericht()` und `WL.urteil()` zeigen Lagebericht und Ampel. Zeitsprünge mit Verbindung nur gegen den
+lokalen Server testen, sonst landen Berichte aus der Zukunft bei den Eltern.
 
 ## Icons neu erzeugen
 

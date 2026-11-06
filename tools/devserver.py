@@ -1,5 +1,5 @@
 """Lokaler Test-Server ohne Browser-Cache (nur zum Entwickeln).
-Start im Ordner 01_general:  python3 word-legends/tools/devserver.py 8765"""
+Start im Projektordner (über apps/): python3 apps/word-legends/tools/devserver.py 8765"""
 import functools
 import http.server
 import os

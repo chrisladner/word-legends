@@ -15,6 +15,13 @@ const TIER_SHORT = ['Neu', '1', '2', '3', '4', '5', '👑'];
 const XP = { type: 10, memo: 5, mc: 5, intro: 5, noTo: 8, hint: 4, typo: 3, levelUp: 5, combo: 10, mission: 20 };
 const OLD_PER_DAY = 6;   // so viele Karten aus älteren Units werden pro Tag höchstens eingestreut
 const TITLES = [[1, 'Rookie'], [4, 'Wortjäger'], [8, 'Vokabel-Profi'], [14, 'Sprach-Ninja'], [22, 'Word Legend']];
+const VERSION = 'wl-v6';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
+
+// Gemeinsame Bausteine von Legends HQ (legends-status.js, legends-sync.js). Fehlen sie, z. B. nach einem halben
+// Update ohne Netz, läuft die App wie bisher – nur ohne Plan-Karte und Eltern-Verbindung.
+const STATUS = window.LegendsStatus || null;
+const SYNC = window.LegendsSync || null;
+if (SYNC) SYNC.configure({ app: 'wl' });
 
 const $ = s => document.querySelector(s);
 const app = $('#app');
@@ -232,16 +239,20 @@ function inDays(n) {
 function fresh() {
   return {
     v: 1,
-    settings: { name: '', newPerDay: 8, testDate: '', strictTo: true, autoSpeak: true, sfx: true, focus: 'auto' },
+    // testSince: Tag, an dem das Kind sein eigenes Testdatum eingetragen hat (für den Lagebericht)
+    settings: { name: '', newPerDay: 8, testDate: '', testSince: '', strictTo: true, autoSpeak: true, sfx: true, focus: 'auto' },
     w: {},
     g: {},          // Grammatik-Thema → Tag, an dem die Regelkarte zum ersten Mal kam
     ticks: {},      // Schularbeits-Zettel: abgehakte Punkte (Listening, Reading)
     write: {},      // Schreibaufgaben: gespeicherter Text, geschaffte Sätze
     stats: { xp: 0, streak: 0, best: 0, lastDay: '', answers: 0, right: 0, sessions: 0 },
     day: { date: '', newCount: 0, gCount: 0 },
-    ui: { hideInstall: false, onboarded: false }
+    ui: { hideInstall: false, onboarded: false },
+    log: {},        // Tagesprotokoll für Plan-Karte und Lagebericht: { 'JJJJ-MM-TT': { a, r, n, s, f, o, k } }
+    plaene: {}      // eingefrorener Plan je Termin ('<datum>|<Stoffmenge>'), legt legends-status.js an und räumt selbst auf
   };
 }
+// Jedes Feld einzeln aufzählen – was hier fehlt, ist beim nächsten Start weg
 function upgrade(s) {
   const d = fresh();
   const obj = x => (x && typeof x === 'object' ? x : {});
@@ -254,7 +265,9 @@ function upgrade(s) {
     write: obj(s.write),
     stats: { ...d.stats, ...(s.stats || {}) },
     day: { ...d.day, ...(s.day || {}) },
-    ui: { ...d.ui, ...(s.ui || {}) }
+    ui: { ...d.ui, ...(s.ui || {}) },
+    log: obj(s.log),
+    plaene: obj(s.plaene)
   };
 }
 function load() {
@@ -265,23 +278,61 @@ function load() {
   return fresh();
 }
 let S = load();
+if (STATUS) STATUS.kuerzen(S.log, today());   // Protokoll: höchstens 90 Tage
 let saveWarned = false;
+let saveCount = 0;   // zählt jede Änderung am Speicherstand – die Plan-Karte rechnet nur neu, wenn sich etwas getan hat
 function save() {
+  saveCount++;
   try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
   catch (e) {
     if (!saveWarned) { saveWarned = true; toast('Speichern klappt gerade nicht. Ist privates Surfen an?'); }
   }
 }
 
+// ---------- Tagesprotokoll (S.log) ----------
+// Jede Aufgabe zählt ihre Sekunden genau einmal: vom Anzeigen bis zur Antwort (legends-status.js nimmt höchstens
+// 60 je Aufgabe – wer das Handy weglegt, übt nicht). Danach läuft die Uhr neu, z. B. fürs Ausbessern.
+let taskStart = 0;
+function taskSec() {
+  const now = Date.now();
+  const s = taskStart ? (now - taskStart) / 1000 : 0;
+  taskStart = now;
+  return s;
+}
+// Erster Versuch des Tages bei einer fälligen Karte – nur diese zählen für die Trefferquote
+function logAnswer(right) { if (STATUS) STATUS.zaehleAntwort(S.log, today(), right, taskSec()); }
+// Eine Karte kommt neu in die Sammlung
+function logNew() { if (STATUS) STATUS.zaehleNeu(S.log, today(), taskSec()); }
+// Alles andere, was geübt wurde: Wiederholung in der Runde, Ausbessern, Probetest, Schreiben, Regel lesen
+function logTime() { if (STATUS) STATUS.zaehleZeit(S.log, today(), taskSec()); }
+
 // ================================================================
 // Karteikasten-Logik
 // ================================================================
 // Schularbeit (exam.js): bis zum Datum zählen alle genannten Units gleich
 function examActive() { return !!EXAM && today() <= EXAM.date; }
-// Ein selbst eingetragenes Testdatum gilt vor der Schularbeit aus exam.js
+// Der offizielle Termin (exam.js) kommt von Mama und Papa: Er geht immer vor und lässt sich in der App nicht
+// verschieben. Ein eigenes Testdatum gilt nur, solange kein offizieller ansteht – ein alter eigener Termin
+// kann eine Schularbeit also nicht mehr überdecken.
 function testDate() {
-  if (S.settings.testDate && S.settings.testDate >= today()) return S.settings.testDate;
-  return examActive() ? EXAM.date : '';
+  if (examActive()) return EXAM.date;
+  const own = S.settings.testDate;
+  return own && own >= today() ? own : '';
+}
+// Der nächste Test für den Lagebericht (quelle: 'eltern' = offiziell, 'selbst' = vom Kind eingetragen).
+// seit = Tag des Eintragens: offiziell EXAM.eingetragen (setzt /stoff), selbst eingetragen settings.testSince.
+// Fehlt er, bleibt seit weg – dann zählt legends-status.js ab dem Tag, an dem die App den Termin zuerst sieht.
+function isDayStr(x) { return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); }
+function nextTest() {
+  let t = null;
+  if (examActive()) {
+    t = { datum: EXAM.date, titel: EXAM.title || 'Schularbeit', quelle: 'eltern' };
+    if (isDayStr(EXAM.eingetragen)) t.seit = EXAM.eingetragen;
+  } else if (testDate()) {
+    t = { datum: testDate(), titel: 'Englisch-Test', quelle: 'selbst' };
+    if (isDayStr(S.settings.testSince)) t.seit = S.settings.testSince;
+  }
+  return t;
 }
 function examMode() { return examActive() && testDate() === EXAM.date; }
 
@@ -430,6 +481,7 @@ function collect(id, lv = 1) {
   if (S.day.date !== t) S.day = { date: t, newCount: 0, gCount: 0 };
   if (c && c.kind === 'g') S.day.gCount = (S.day.gCount || 0) + 1;
   else S.day.newCount++;
+  logNew();
 }
 
 // Nur der erste Versuch des Tages bei einer geladenen Karte zählt für die Stufe
@@ -1102,6 +1154,7 @@ function home() {
       ${testPill}
     </div>
     <div class="panel mission">${mission}</div>
+    ${planSlot()}
     ${exam ? examPanel() : ''}
     ${installHint}
     <div class="shelf">
@@ -1120,6 +1173,59 @@ function home() {
     </div>
     <button class="btn big ghostish" type="button" data-act="rules">📘 Grammatik-Regeln</button>
   </section>`;
+}
+
+// ---------- Plan-Karte: dieselbe Ampel, die Mama und Papa sehen – im Ton fürs Kind, ohne Rot, ohne Minuten, ohne XP ----------
+// Mit Testdatum rechnet die Prognose (legends-status.js) je nach Abstand bis zu ein paar Zehntelsekunden. Darum: Ergebnis
+// merken, solange sich weder der Tag noch der Speicherstand ändert, und sonst erst die Startseite zeigen, dann füllen.
+let PLAN = null;   // { key, bericht, urteil }
+function planKey() { return today() + '|' + saveCount; }
+function planNow() {
+  if (PLAN && PLAN.key === planKey()) return PLAN;
+  const bericht = STATUS.bericht(berichtEingabe());
+  save();   // bericht() trägt fertig, offen und sicher von heute ins Protokoll ein und friert den Plan je Termin ein
+  PLAN = { key: planKey(), bericht, urteil: STATUS.urteil(bericht, today()) };
+  return PLAN;
+}
+// Nie darf die Startseite an der Plan-Karte hängen: Jeder Fehler hier lässt nur die Karte weg.
+function planSlot() {
+  if (!STATUS) return '';
+  try {
+    if (PLAN && PLAN.key === planKey()) return planHTML(PLAN);
+    setTimeout(() => {
+      const el = $('#plan');
+      if (!el) return;
+      try { el.outerHTML = planHTML(planNow()); }
+      catch (e) { el.remove(); console.warn('Plan-Karte:', e); }
+    }, 30);
+    // bis dahin der letzte Stand (fast immer gleich) bzw. ein leerer Platzhalter
+    return PLAN ? planHTML(PLAN) : '<div class="panel plan wait" id="plan" aria-hidden="true"></div>';
+  } catch (e) {
+    console.warn('Plan-Karte:', e);
+    return '';
+  }
+}
+const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DAY_STATE = { fertig: 'Runde fertig', teil: 'geübt, Runde nicht fertig', aus: 'nicht geübt', frei: 'nichts fällig', offen: 'noch offen' };
+function planHTML(p) {
+  const b = p.bericht, u = p.urteil;
+  const tone = u.stufe === 'rot' ? 'sos' : u.stufe === 'gelb' ? 'catch' : 'ok';
+  // Die letzten 7 Tage: sechs aus dem Bericht, dazu heute (noch offen ist heute kein verpasster Tag)
+  const t = today(), e = S.log[t] || {};
+  const todayState = e.f ? 'fertig' : (e.a || 0) + (e.n || 0) > 0 ? 'teil' : b.heute.faellig + b.heute.neu > 0 ? 'offen' : 'frei';
+  const days = b.tage.slice(-6).map(x => ({ d: x.d, s: x.s })).concat({ d: t, s: todayState, today: true });
+  const dots = days.map(x => {
+    const [y, m, d] = x.d.split('-').map(Number);
+    const wd = new Date(y, m - 1, d, 12).getDay();
+    const name = x.today ? 'heute' : DAY_SHORT[wd];
+    return `<li class="pday ${x.s}${x.today ? ' today' : ''}" aria-label="${x.today ? 'Heute' : WEEKDAYS[wd]}: ${DAY_STATE[x.s] || ''}"><i aria-hidden="true"></i><span aria-hidden="true">${name}</span></li>`;
+  }).join('');
+  return `<div class="panel plan ${tone}" id="plan">
+    <div class="plan-head"><span class="eyebrow">Dein Plan</span><span class="plan-stamp">${esc(u.kind.titel)}</span></div>
+    <p class="plan-text">${esc(u.kind.text)}</p>
+    <ol class="plan-days" aria-label="Die letzten 7 Tage">${dots}</ol>
+    <p class="fineprint">Das sehen Mama und Papa auch.</p>
+  </div>`;
 }
 
 // ---------- Schularbeit: Zettel der Lehrerin mit echtem Fortschritt ----------
@@ -1617,9 +1723,12 @@ function settings() {
           <option value="all" ${s.focus === 'all' ? 'selected' : ''}>Alle Units gleich</option>
         </select>
         <small>Aus dieser Unit kommen die neuen Wörter zuerst, und für sie gilt das Testdatum. Ältere Units werden mit höchstens ${OLD_PER_DAY} Karten pro Tag eingestreut. „Alle gleich“ passt, wenn eine Schularbeit mehrere Units abfragt.</small></label>` : ''}
-      <label class="field"><b>Testdatum</b>
+      ${examActive() ? `<div class="field"><b>Testdatum</b>
+        <span class="daterow"><input id="set-test" type="date" value="${esc(EXAM.date)}" disabled aria-describedby="set-test-hint"></span>
+        <small id="set-test-hint"><b class="lockline">🔒 Termin von Mama/Papa</b>${esc(EXAM.title)} am ${esc(dateLabel(EXAM.date))}. Bis dahin verteilt die App alles so, dass es sich ausgeht.</small></div>`
+      : `<label class="field"><b>Testdatum</b>
         <span class="daterow"><input id="set-test" type="date" value="${esc(s.testDate)}">${s.testDate ? '<button class="link" type="button" data-act="clearTest">löschen</button>' : ''}</span>
-        <small>${examActive() && !s.testDate ? `Die ${esc(EXAM.title)} am ${esc(dateLabel(EXAM.date))} ist schon eingeplant. Ein eigenes Datum hier geht vor.` : 'Mit Datum verteilt die App alle neuen Wörter rechtzeitig und holt am Tag vor dem Test jede Karte noch einmal heraus.'}</small></label>
+        <small>Mit Datum verteilt die App alle neuen Wörter rechtzeitig und holt am Tag vor dem Test jede Karte noch einmal heraus.</small></label>`}
       ${toggleHTML('strictTo', '„to“ bei Verben verlangen', 'Ohne „to“ gibt es im Probetest nur einen halben Punkt.')}
       ${toggleHTML('autoSpeak', 'Wörter vorlesen', 'Britische Aussprache. Ab Stufe 3 kommen auch Hör-Aufgaben.')}
       ${toggleHTML('sfx', 'Töne & Vibration', '')}
@@ -1630,6 +1739,7 @@ function settings() {
         <small>Der Code enthält den ganzen Fortschritt. Damit kannst du alles wiederherstellen, z. B. auf einem neuen Handy.</small></div>
       <div class="two"><button class="btn" type="button" data-act="exportCode">Code kopieren</button><button class="btn" type="button" data-act="importCode">Code einfügen</button></div>
     </div>
+    <div class="panel form hq">${hqPanelHTML()}</div>
     <button class="btn danger big" type="button" data-act="reset">Fortschritt löschen</button>
     <p class="fineprint center">Word Legends · ${WORDS.length} Wörter · ${window.UNITS.map(u => esc(u.title)).join(', ')}<span id="set-ver"></span></p>
   </section>`;
@@ -1645,13 +1755,17 @@ function settings() {
   const focusSel = $('#set-focus');
   if (focusSel) focusSel.addEventListener('change', e => { S.settings.focus = e.target.value; save(); toast('Schwerpunkt gespeichert.'); });
   $('#set-test').addEventListener('change', e => {
+    if (examActive()) return;   // offizieller Termin: nicht verschiebbar
     const v = e.target.value;
     if (v && daysBetween(today(), v) < 0) { toast('Das Datum liegt in der Vergangenheit.'); e.target.value = S.settings.testDate; return; }
     S.settings.testDate = v;
+    S.settings.testSince = v ? today() : '';
     save();
     settings();
     if (v) toast(`Test ${inDays(daysBetween(today(), v))} – alles klar!`);
   });
+  const hqForm = $('#hq-form');
+  if (hqForm) hqForm.addEventListener('submit', e => { e.preventDefault(); hqConnect(); });
   app.querySelectorAll('[data-set]').forEach(el => el.addEventListener('change', () => {
     S.settings[el.dataset.set] = el.checked;
     save();
@@ -1683,7 +1797,8 @@ function about() {
       <p><b>Fehler sofort ausbessern.</b> Nach einem Fehler wird das Wort einmal richtig abgeschrieben und kommt in derselben Runde noch einmal dran (Look – Cover – Write – Check).</p>
       <p><b>Kontext und Aussprache.</b> Die Beispielsätze aus dem Buch werden zu Lückensätzen, dazu britische Aussprache und ab Stufe 3 Hördiktate.</p>
       <p><b>Kleine Portionen.</b> Standardmäßig 8 neue Wörter pro Tag, gemischt mit Wiederholungen. Gegensatzpaare wie open/close und leicht verwechselbare Wörter wie their/your/our kommen nie am selben Tag neu dazu.</p>
-      <p><b>Testdatum.</b> In den Einstellungen eintragen: Dann kommen alle neuen Wörter rechtzeitig dran, und am Tag vor dem Test wird jede Karte noch einmal abgefragt.</p>
+      <p><b>Testdatum.</b> Schularbeiten tragen die Eltern ein (exam.js); dieser Termin geht vor und lässt sich in der App nicht verschieben. Für andere Tests kann ${kid} in den Einstellungen selbst ein Datum eintragen. Mit Datum kommen alle neuen Wörter rechtzeitig dran, und am Tag vor dem Test wird jede Karte noch einmal abgefragt.</p>
+      <p><b>Plan-Karte.</b> Auf der Startseite steht, ob ${kid} für den nächsten Test im Plan ist: dieselbe Ampel, die die Eltern in Legends HQ sehen, für ${kid} in eigenen Worten und ohne Rot. Mit Verbindungs-Code (Einstellungen → Eltern-Verbindung) meldet die App einen kurzen Lagebericht ohne Namen (Zahlen und die wackeligsten Wörter); die Sicherung des ganzen Fortschritts ist verschlüsselt.</p>
       <p><b>Neue Units.</b> Die neueste Unit hat Vorrang: Ihre Wörter kommen zuerst, und das Testdatum gilt für sie. Ältere Units laufen im Hintergrund weiter. Ihre Karten kommen in immer längeren Abständen wieder, höchstens ${OLD_PER_DAY} pro Tag, damit nichts vergessen wird und die Runde trotzdem kurz bleibt.</p>
     </div>
     ${EXAM ? `<div class="panel prose">
@@ -1820,6 +1935,7 @@ function next() {
   if (SES.cur) SES.done++;
   if (!SES.queue.length) { SES.cur = null; return finish(); }
   SES.cur = SES.queue.shift();
+  taskStart = Date.now();   // Tagesprotokoll: ab jetzt läuft die Zeit dieser Aufgabe
   showTask();
 }
 
@@ -2036,6 +2152,7 @@ function writeAnswer(val) {
   const perfect = r.bad.length === 0;
   SES.first++;
   S.stats.answers++;
+  logTime();
   const key = isCase ? 'case' : 'scene';
   S.write[key] = S.write[key] || { done: 0 };
   if (perfect) {
@@ -2083,6 +2200,7 @@ function writeTestAnswer(val) {
   const f = roomFacts(t.room[t.target]);
   const r = val.trim() ? checkRoomSentence(val, f) : { score: 0, bad: ['leer gelassen'] };
   SES.results.push({ id: 'w', sec: 'write', input: val.trim(), pts: r.score, max: 2, model: modelRoom(f)[0], bad: r.bad });
+  logTime();
   save();
   sfx('tap');
   next();
@@ -2111,7 +2229,9 @@ function onNext() {
   const t = SES.cur;
   if (SES.phase === 'intro') {
     if (t.type === 'grule') {
-      if (!S.g[t.topic]) { S.g[t.topic] = today(); save(); }
+      if (!S.g[t.topic]) S.g[t.topic] = today();
+      logTime();   // Regel gelesen – zählt als geübte Zeit
+      save();
       return next();
     }
     return startMemo();
@@ -2208,8 +2328,9 @@ function resolve(res, info) {
   if (t.scored && !SES.scored.has(t.id)) {
     SES.scored.add(t.id);
     sched = review(t.id, res);
+    logAnswer(good);
     if (sched.to > sched.from) SES.ups.push({ id: t.id, from: sched.from, to: sched.to });
-  }
+  } else logTime();
 
   let xp = 0;
   if (good) {
@@ -2364,7 +2485,7 @@ function feedbackGram(res, info, sched, xp) {
 function retype(val) {
   const t = SES.cur, c = BY_ID[t.id];
   const ok = c.kind === 'g' ? checkGram(c, val).res === 'ok' : check(c, val, t.type === 'cloze' ? 'cloze' : 'type').res === 'ok';
-  if (ok) { sfx('tap'); return next(); }
+  if (ok) { sfx('tap'); logTime(); save(); return next(); }   // Ausbessern zählt als geübte Zeit
   shake(field());
   if (c.kind !== 'g' && check(c, val, 'type').res === 'noTo') toast('Mit „to“ davor!');
   focusInput();
@@ -2373,6 +2494,7 @@ function retype(val) {
 function recordTest(pts, input, res) {
   const t = SES.cur, st = S.w[t.id];
   SES.results.push({ id: t.id, input, res, pts, max: 1, sec: t.sec || 'v' });
+  logTime();
   S.stats.answers++;
   if (pts === 1) S.stats.right++;
   if (st) {
@@ -2434,6 +2556,7 @@ async function quit() {
     return;
   }
   if (s.mode !== 'test' && s.mode !== 'exam' && s.first >= 10) { markDay(); save(); }
+  if (s.done > 0) afterRound();
   home();
 }
 
@@ -2443,6 +2566,7 @@ function finish() {
   E.area.blur();
   SES = null;
   document.body.classList.remove('in-session');
+  afterRound();
   if (s.mode === 'test') { markDay(); S.stats.sessions++; save(); return testResult(s); }
   if (s.mode === 'exam') { markDay(); S.stats.sessions++; save(); return examResult(s); }
   if (s.mode === 'mission') {
@@ -2503,6 +2627,193 @@ async function resetAll() {
 }
 
 // ================================================================
+// Lagebericht und Eltern-Verbindung (Legends HQ)
+// Vertrag: apps/legends-hq/docs/schnittstelle.md, Abschnitte 4–8 und 11
+// ================================================================
+function clock() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+// Bezeichnung einer Karte für „wackelig“ im Bericht: Vokabel „en = de“, Grammatik der ganze Satz
+function cardLabel(c) { return c.kind === 'g' ? c.full : `${c.en} = ${c.de}`; }
+// Was gemessen wird, als kurzer Text: „Schularbeit 05.11.“, „Test 20.11.“ oder die Schwerpunkt-Unit
+function goalText(test) {
+  if (test) {
+    const [, m, d] = test.datum.split('-');
+    return (/schularbeit/i.test(test.titel) ? 'Schularbeit ' : 'Test ') + d + '.' + m + '.';
+  }
+  const f = focusSet();
+  return f ? f.map(unitTitle).join(' + ') : 'Alle Units';
+}
+
+// Eingabe für LegendsStatus.bericht(). Ziel = Stoff des nächsten Tests: in der Schularbeitszeit EXAM.units,
+// sonst die Schwerpunkt-Unit (focusSet), ohne Schwerpunkt alle Units. Die Regeln bilden die Lernlogik oben ab.
+function berichtEingabe() {
+  const test = nextTest();
+  const exam = examMode();
+  const unseen = CARDS.filter(c => !S.w[c.id]);
+  const nn = newCounts();
+  return {
+    app: 'wl', name: 'Word Legends', version: VERSION,
+    heute: today(), zeit: clock(),
+    test,
+    ziel: goalText(test),
+    // since: Tag des Sammelns – damit lässt sich der Stand am Eintragetag des Termins nachbilden (Plan)
+    karten: collectedCards().map(c => {
+      const st = S.w[c.id];
+      return { lv: st.lv, due: effDue(c), last: st.last, since: st.since, imZiel: inFocus(c), label: cardLabel(c), ok: st.ok, bad: st.bad };
+    }),
+    neuOffen: { ziel: unseen.filter(inFocus).length, gesamt: unseen.length },
+    heuteOffen: { faellig: missionDue().length, neu: nn.v + nn.g },
+    // sekNeu, sekWdh, sekFehler: Annahmen der Lernforschung aus legends-status.js, bis es eigene Messwerte gibt
+    regeln: {
+      pausen: INTERVALS, maxPause: LEGEND_INTERVAL, maxStufe: 6, sicherAb: 3, fehlerMinus: 2,
+      neuProTag: S.settings.newPerDay + GRAM_PER_DAY,
+      vorlauf: exam ? 2 : 1,             // wie lead in newQuota()
+      wdhLimit: exam ? REVIEW_CAP : 0,   // wie capReviews()
+      paket: 1                           // Vokabeln einzeln; Grammatik in Dreiergruppen ändert die Tagesmenge kaum
+    },
+    log: S.log,         // bericht() trägt f, o, k von heute ein
+    plaene: S.plaene    // bericht() friert hier den Plan je Termin ein
+  };
+}
+
+// Ende einer Runde: den Tag ins Protokoll schreiben (Runde fertig?), dann melden und sichern.
+// Kurz warten, damit zuerst die Zusammenfassung erscheint. Kein requestAnimationFrame: Das ruht, solange die
+// Seite verdeckt ist (App gleich nach der Runde weggewischt), ein Timer läuft trotzdem.
+function afterRound() {
+  if (!STATUS) return;
+  setTimeout(() => {
+    try { planNow(); } catch (e) { console.warn('Lagebericht:', e); }
+    hqReport({ backup: true });
+  }, 350);
+}
+
+// Melden (und auf Wunsch sichern), nur mit Verbindung. Nie blockierend, Fehler bleiben still:
+// Klappt es nicht, geht beim nächsten Mal einfach der neuere Bericht.
+let hqBusy = false, hqQueued = null;
+let hqLastOk = 0;   // letzte erfolgreiche Meldung – beim Zurückholen aus dem Hintergrund höchstens alle 10 Minuten
+async function hqReport(opt = {}) {
+  if (!SYNC || !STATUS || !SYNC.verbunden()) return;
+  if (opt.pause && Date.now() - hqLastOk < opt.pause) return;
+  if (hqBusy) { hqQueued = { backup: !!(opt.backup || (hqQueued && hqQueued.backup)) }; return; }
+  hqBusy = true;
+  try {
+    const p = planNow();
+    const r = await SYNC.melden({ ...p.bericht, zeit: clock() });
+    if (r.ok) hqLastOk = Date.now();
+    // Kopie: die Sicherung zeigt genau den Stand vom Ende der Runde
+    if (opt.backup) await SYNC.sichern(JSON.parse(JSON.stringify(S)), { tag: today(), version: VERSION });
+  } catch (e) { /* still */ }
+  hqBusy = false;
+  hqShowState();
+  if (hqQueued) { const o = hqQueued; hqQueued = null; hqReport(o); }
+}
+
+// ---------- Einstellungen → Eltern-Verbindung ----------
+// 'JJJJ-MM-TT HH:MM' (Gerätezeit aus legends-sync.js) → '18:02' für heute, sonst '5.11. 18:02'
+function hqWhen(s) {
+  if (!s) return '';
+  const [d, hm] = s.split(' ');
+  if (d === fmt(new Date())) return hm;
+  const [, m, dd] = d.split('-').map(Number);
+  return `${dd}.${m}. ${hm}`;
+}
+function hqStateHTML() {
+  const z = SYNC.zustand();
+  const parts = ['verbunden', z.gemeldet ? 'gemeldet ' + hqWhen(z.gemeldet) : 'noch nicht gemeldet'];
+  if (z.gesichert) parts.push('gesichert ' + hqWhen(z.gesichert));
+  return `<b>${esc(parts.join(' · '))}</b>${z.fehler ? `<small>Zuletzt hat es nicht geklappt: ${esc(z.fehler)}. Die App versucht es beim nächsten Mal wieder.</small>` : ''}`;
+}
+function hqShowState() {
+  const el = $('#hq-state');
+  if (el && SYNC && SYNC.verbunden()) el.innerHTML = hqStateHTML();
+}
+function hqPanelHTML() {
+  const head = `<div class="field"><b>Eltern-Verbindung</b>
+    <small>Mama und Papa sehen, ob du im Plan bist – dasselbe wie auf deiner Startseite. Deine Antworten und Texte bleiben verschlüsselt.</small></div>`;
+  if (!SYNC) return head + '<p class="fineprint">Gerade nicht verfügbar. Öffne die App einmal mit Internet.</p>';
+  if (!SYNC.verbunden()) {
+    return head + `<form class="hq-form" id="hq-form" autocomplete="off" novalidate>
+      <input id="hq-code" type="text" placeholder="Verbindungs-Code (HQ1:…)" aria-label="Verbindungs-Code" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+      <button class="btn go" type="submit">Verbinden</button>
+    </form>`;
+  }
+  return head + `<p class="hq-state" id="hq-state" aria-live="polite">${hqStateHTML()}</p>
+    <div class="hq-btns">
+      <button class="btn" type="button" data-act="hqRestore">Aus Sicherung holen</button>
+      <button class="link" type="button" data-act="hqDisconnect">Verbindung trennen</button>
+    </div>`;
+}
+
+async function hqConnect() {
+  const input = $('#hq-code'), btn = $('#hq-form .btn');
+  if (!input || !SYNC) return;
+  const code = input.value.trim();
+  if (!code) { shake(input); input.focus(); return; }
+  input.blur();
+  btn.disabled = true;
+  btn.textContent = 'Verbinde …';
+  const r = await SYNC.verbinden(code);
+  if (!r.ok) {
+    toast(r.fehler || 'Verbinden hat nicht geklappt.');
+    if (btn.isConnected) { btn.disabled = false; btn.textContent = 'Verbinden'; }
+    return;
+  }
+  toast('Verbunden ✓');
+  if (screen === 'settings') settings();
+  hqReport({ backup: true });   // gleich melden und die erste Sicherung ablegen
+}
+
+// Holt die letzte Sicherung und ersetzt nach Rückfrage den Fortschritt auf diesem Gerät (wie „Code einfügen“).
+// Erst holen, dann fragen: So steht in der Rückfrage, wie alt die Sicherung ist.
+let hqRestoring = false;
+async function hqRestore() {
+  if (!SYNC || hqRestoring) return;
+  hqRestoring = true;
+  const btn = app.querySelector('[data-act="hqRestore"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Hole Sicherung …'; }
+  let daten = null, fehler = '';
+  try { daten = await SYNC.holen(); }
+  catch (e) {
+    const net = !e || e.name === 'TypeError' || e.name === 'AbortError';   // fetch ohne Netz bzw. Zeit abgelaufen
+    fehler = e && e.status === 404 ? 'Es gibt noch keine Sicherung.'
+      : e && e.status === 401 ? 'Der Code passt nicht mehr zum Server.'
+      : e && e.status ? 'Der Server hat gerade ein Problem. Probier es später nochmal.'
+      : net ? 'Holen hat nicht geklappt. Ist Internet da?'
+      : 'Die Sicherung lässt sich nicht öffnen.';
+  }
+  hqRestoring = false;
+  if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = 'Aus Sicherung holen'; }
+  if (fehler) return toast(fehler);
+  const st = daten && daten.stand;
+  if (!st || daten.app !== 'wl' || !st.w || typeof st.w !== 'object' || !st.settings) return toast('Die Sicherung passt nicht zu Word Legends.');
+  const isDay = x => /^\d{4}-\d{2}-\d{2}$/.test(x || '');
+  const nBackup = CARDS.filter(c => st.w[c.id]).length;
+  const v = await sheet(`<h2 class="sheet-title">Aus Sicherung holen?</h2>
+    <p>Sicherung vom <b>${isDay(daten.tag) ? esc(dateLabel(daten.tag)) : 'unbekannten Tag'}</b> mit ${nBackup} Karten.
+      Auf diesem Gerät: ${collectedCards().length} Karten${isDay(S.stats.lastDay) ? `, zuletzt geübt ${esc(dateLabel(S.stats.lastDay))}` : ''}.</p>
+    <p>Achtung: Das ersetzt den Fortschritt auf diesem Gerät.</p>`,
+    [{ label: 'Wiederherstellen', value: 'go', cls: 'go' }, { label: 'Abbrechen', value: null }]);
+  if (v !== 'go') return;
+  S = upgrade(st);
+  if (STATUS) STATUS.kuerzen(S.log, today());
+  save();
+  toast('Fortschritt wiederhergestellt ✓');
+  home();
+}
+
+async function hqDisconnect() {
+  const v = await sheet(`<h2 class="sheet-title">Verbindung trennen?</h2>
+    <p>Dann bekommen Mama und Papa keine Meldungen und keine Sicherungen mehr von Word Legends. Dein Fortschritt bleibt auf diesem Gerät.</p>`,
+    [{ label: 'Verbunden bleiben', value: null, cls: 'go' }, { label: 'Trennen', value: 'yes' }]);
+  if (v !== 'yes' || !SYNC) return;
+  SYNC.trennen();
+  toast('Verbindung getrennt.');
+  if (screen === 'settings') settings();
+}
+
+// ================================================================
 // Aktionen
 // ================================================================
 const ACT = {
@@ -2527,7 +2838,9 @@ const ACT = {
   idk: () => idk(),
   choice: b => onChoice(b),
   setNew: b => { S.settings.newPerDay = +b.dataset.n; save(); settings(); },
-  clearTest: () => { S.settings.testDate = ''; save(); settings(); },
+  clearTest: () => { S.settings.testDate = ''; S.settings.testSince = ''; save(); settings(); },
+  hqRestore: () => hqRestore(),
+  hqDisconnect: () => hqDisconnect(),
   exportCode: () => exportCode(),
   importCode: () => importCode(),
   reset: () => resetAll(),
@@ -2578,7 +2891,13 @@ app.addEventListener('change', e => {
 app.addEventListener('mousedown', e => { if (e.target.closest('.keepfocus')) e.preventDefault(); });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && screen === 'home') home();
+  if (document.visibilityState === 'visible') {
+    if (screen === 'home') home();
+    hqReport({ pause: 10 * 60e3 });
+  } else if (STATUS) {
+    // Beim Verlassen den Tag ins Protokoll schreiben (fertig, offen, sicher) – falls die Startseite heute nicht mehr kommt
+    try { planNow(); } catch (e) { /* egal */ }
+  }
 });
 
 // Nur zum Testen am Mac: WL.shiftDays(1) springt einen Tag weiter
@@ -2592,6 +2911,13 @@ window.WL = {
   caseText: (text, items) => checkCaseText(text, items),
   meText: text => checkMeText(text),
   counts: () => ({ due: missionDue().length, ...newCounts(), unseenV: unseenWords().length, unseenG: unseenGram().length }),
+  // Lagebericht frisch rechnen (wie er an Legends HQ ginge) · Ampel dazu (opt: { abend: true }) · Eingabe dafür
+  bericht() { PLAN = null; return planNow().bericht; },
+  urteil: opt => STATUS.urteil(planNow().bericht, today(), opt),
+  eingabe: () => berichtEingabe(),
+  // Jetzt melden und sichern (nur mit Verbindung) → danach WL.sync zeigt den Zustand
+  melden: () => hqReport({ backup: true }).then(() => SYNC && SYNC.zustand()),
+  get sync() { return SYNC && SYNC.zustand(); },
   shiftDays(n) {
     dayOffset += n;
     try { sessionStorage.setItem('wl.dayOffset', String(dayOffset)); } catch (e) { /* egal */ }
@@ -2605,6 +2931,8 @@ window.WL = {
 // ================================================================
 syncViewport();
 if (S.ui.onboarded) home(); else welcome();
+// Nach dem Start einmal melden (nur mit Verbindung), wenn die Startseite schon steht
+setTimeout(() => hqReport(), 1500);
 
 // Offline-Cache nur auf der echten Seite – lokal beim Entwickeln stört er (mit ?sw trotzdem testen)
 const devHost = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !/[?&]sw\b/.test(location.search);

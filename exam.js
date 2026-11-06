@@ -5,6 +5,9 @@
   neue Karten werden bis 3 Tage vorher verteilt, in den letzten 3 Tagen kommt jede Karte
   noch einmal dran (schwache am Tag davor). Danach läuft die App normal weiter.
   Die Abschnitte entsprechen dem Zettel „English test on November 5th, 2026“.
+  Der Termin gilt als „von Mama/Papa“: Er geht jedem eigenen Testdatum vor und ist in der App gesperrt.
+  eingetragen (optional, 'JJJJ-MM-TT'): Tag, an dem der Termin eingetragen wurde (setzt /stoff) – ab da rechnet
+  der Lagebericht an Legends HQ den Plan. Fehlt es, zählt der Tag, an dem die App den Termin zuerst sieht.
 */
 window.EXAM = {
   id: 'sa-2026-11-05',
