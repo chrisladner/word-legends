@@ -192,8 +192,8 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .mission .two { margin-top: 12px; }
 .mission .fineprint { margin-top: 10px; }
 
-/* Plan-Karte: Stempel in der Stufenfarbe (Im Plan = Lime, Aufholen = Sonne, Notfallplan = Orange – nie Rot),
-   darunter die letzten 7 Tage als Punkte */
+/* Plan-Karte: Stempel in der Stufenfarbe (Im Plan = Lime, Aufholen = Sonne, Notfallplan = Orange – nie Rot,
+   Kein Termin = neutral grau), darunter die letzten 7 Tage als Punkte */
 .plan { display: grid; gap: 10px; }
 .plan.wait { min-height: 176px; opacity: .35; }   /* Platzhalter, bis die Prognose gerechnet ist */
 .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -204,6 +204,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 }
 .plan.catch .plan-stamp { background: var(--sun); }
 .plan.sos .plan-stamp { background: var(--t5); }
+.plan.calm .plan-stamp { background: var(--mist); }   /* ohne Termin keine Ampel: weder grün noch Alarm */
 .plan-text { font: 700 16.5px/1.4 var(--body); }
 .plan-days { list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .pday { display: grid; justify-items: center; gap: 5px; }

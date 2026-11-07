@@ -15,7 +15,7 @@ const TIER_SHORT = ['Neu', '1', '2', '3', '4', '5', '👑'];
 const XP = { type: 10, memo: 5, mc: 5, intro: 5, noTo: 8, hint: 4, typo: 3, levelUp: 5, combo: 10, mission: 20 };
 const OLD_PER_DAY = 6;   // so viele Karten aus älteren Units werden pro Tag höchstens eingestreut
 const TITLES = [[1, 'Rookie'], [4, 'Wortjäger'], [8, 'Vokabel-Profi'], [14, 'Sprach-Ninja'], [22, 'Word Legend']];
-const VERSION = 'wl-v6';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
+const VERSION = 'wl-v7';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
 
 // Gemeinsame Bausteine von Legends HQ (legends-status.js, legends-sync.js). Fehlen sie, z. B. nach einem halben
 // Update ohne Netz, läuft die App wie bisher – nur ohne Plan-Karte und Eltern-Verbindung.
@@ -1209,7 +1209,8 @@ const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const DAY_STATE = { fertig: 'Runde fertig', teil: 'geübt, Runde nicht fertig', aus: 'nicht geübt', frei: 'nichts fällig', offen: 'noch offen' };
 function planHTML(p) {
   const b = p.bericht, u = p.urteil;
-  const tone = u.stufe === 'rot' ? 'sos' : u.stufe === 'gelb' ? 'catch' : 'ok';
+  // Ohne Termin (pause) oder ohne Bericht (unbekannt) gibt es keine Ampel: neutral grau, nicht grün
+  const tone = { rot: 'sos', gelb: 'catch', gruen: 'ok' }[u.stufe] || 'calm';
   // Die letzten 7 Tage: sechs aus dem Bericht, dazu heute (noch offen ist heute kein verpasster Tag)
   const t = today(), e = S.log[t] || {};
   const todayState = e.f ? 'fertig' : (e.a || 0) + (e.n || 0) > 0 ? 'teil' : b.heute.faellig + b.heute.neu > 0 ? 'offen' : 'frei';
