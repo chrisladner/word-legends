@@ -72,7 +72,7 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v7`; die Version steht auch im
+Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v8`; die Version steht auch im
 Lagebericht und in der Sicherung), und neu veröffentlichen.
 
 So kommt ein Update aufs iPhone (seit `wl-v5`): Mit Internet holt der Offline-Cache die App-Dateien
@@ -80,7 +80,7 @@ immer frisch vom Server (höchstens 2,5 s warten, sonst Cache). Ein neuer `VERSI
 und beim Zurückholen aus dem Hintergrund gefunden; die App lädt dann von selbst neu, sobald man auf der
 Startseite ist, nie mitten in einer Runde. Kommt das Update von `wl-v1`…`wl-v4` (diese Seiten konnten
 sich noch nicht selbst neu laden), lädt der neue Offline-Cache das offene Fenster einmal neu (`LEGACY`).
-Welche Version am Handy läuft, steht unten in den Einstellungen („Version 6“).
+Welche Version am Handy läuft, steht unten in den Einstellungen („Version 8“).
 
 ## Eltern-Verbindung und Plan-Karte (seit `wl-v6`)
 
@@ -93,7 +93,7 @@ Anbindung an Legends HQ (Eltern-Hub). Vertrag: `apps/legends-hq/docs/schnittstel
 | Tagesprotokoll `S.log` | `{ 'JJJJ-MM-TT': { a, r, n, s, f, o, k } }`, in `fresh()` und `upgrade()`, beim Laden auf 90 Tage gekürzt. a/r = erste Versuche bei fälligen Karten (dort, wo `review()` läuft) und davon richtig · n = neu gesammelte Karten (`collect()`) · s = Sekunden vom Anzeigen bis zur Antwort, je Aufgabe höchstens 60 (auch Wiederholung in der Runde, Ausbessern, Regel lesen, Probetest, Generalprobe, Schreiben) · f/o/k setzt `LegendsStatus.bericht()` |
 | Lagebericht | `berichtEingabe()` → `LegendsStatus.bericht()`, danach `save()`. Ziel = in der Schularbeitszeit `EXAM.units`, sonst die Schwerpunkt-Unit, ohne Schwerpunkt alle Units. Je Karte Stufe, effektiv fällig (`effDue`), zuletzt, gesammelt seit (`since`), im Ziel, Bezeichnung, richtig/falsch. Regeln wie die Lernlogik: Pausen 1·2·4·7·14·30, Legendär 60, sicher ab Stufe 3, Fehler −2, Neue pro Tag = Einstellung + 6 Grammatik, Vorlauf 2 im Schularbeits-Modus sonst 1, Limit 55 Wiederholungen im Schularbeits-Modus sonst keins, Paket 1. Unter 2 KB, ohne Namen |
 | Plan je Termin `S.plaene` | in `fresh()` und `upgrade()`. `bericht()` friert beim ersten Bericht zu einem Termin ein, was der App-Plan ab dem Eintragetag bei täglichem Üben erreicht (Schlüssel `'<datum>\|<Stoffmenge>'`), und räumt vergangene Termine selbst weg. Die Ampel misst den Abstand dazu |
-| Plan-Karte | Startseite unter der Mission: `urteil(bericht, heute).kind` (Im Plan ✓ · Aufholen · Notfallplan; ohne Termin seit `wl-v7` grau „Kein Termin“), die letzten 6 Tage plus heute als Punkte (✓ fertig, halb = geübt, gestrichelt = nicht geübt, hell = nichts fällig, Ring = heute offen), darunter „Das sehen Mama und Papa auch.“ Kein Rot, keine Minuten, keine XP. Rechnet auch ohne Verbindung. Mit Testdatum braucht die Prognose bis zu ein paar Zehntelsekunden: Das Ergebnis wird je Tag und Speicherstand gemerkt, sonst erscheint die Startseite zuerst und die Karte kurz danach |
+| Plan-Karte | Startseite unter der Mission: `urteil(bericht, heute).kind` (Im Plan ✓ · Aufholen · Notfallplan; ohne Termin seit `wl-v7` grau „Kein Termin“; seit `wl-v8` heißt der ganze Tag auch dort „Mission“, z. B. „Mission geschafft ✓“, und Legends HQ sagt „Mission fertig“ – nur neue Texte in `legends-status.js`, Bericht und Ampel unverändert), die letzten 6 Tage plus heute als Punkte (✓ fertig, halb = geübt, gestrichelt = nicht geübt, hell = nichts fällig, Ring = heute offen), darunter „Das sehen Mama und Papa auch.“ Kein Rot, keine Minuten, keine XP. Rechnet auch ohne Verbindung. Mit Testdatum braucht die Prognose bis zu ein paar Zehntelsekunden: Das Ergebnis wird je Tag und Speicherstand gemerkt, sonst erscheint die Startseite zuerst und die Karte kurz danach |
 | Termine | Offizieller Termin (`exam.js`, `quelle: 'eltern'`, `seit` = `EXAM.eingetragen`) geht immer vor, das Testdatum in den Einstellungen ist dann gesperrt („Termin von Mama/Papa“). Ein eigenes Datum (`quelle: 'selbst'`, `seit` = `settings.testSince`) gibt es nur ohne offiziellen. Ohne Eintragedatum bleibt `seit` weg; dann zählt der Tag, an dem die App den Termin zuerst sieht |
 | Einstellungen → Eltern-Verbindung | Verbindungs-Code (`HQ1:…`) einfügen → „Verbinden“ (prüft beim Server, dann gleich melden und sichern). Zustand „verbunden · gemeldet 18:02 · gesichert 18:02“, Fehler als Hinweis darunter. „Aus Sicherung holen“ holt zuerst, fragt dann mit Datum und Kartenzahl beider Stände nach und spielt den Stand über `upgrade()` ein. „Verbindung trennen“ mit Rückfrage. Der Code liegt in `localStorage['legends.sync.v1']`, nie im Sicherungs-Code der App |
 | Melden | nur mit Verbindung, nie blockierend, Fehler still: 1,5 s nach dem Start, beim Zurückholen aus dem Hintergrund (höchstens alle 10 Minuten), am Ende jeder Runde (auch beim Abbrechen, wenn schon geübt wurde) |
