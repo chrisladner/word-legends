@@ -1206,7 +1206,8 @@ function planSlot() {
   }
 }
 const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-const DAY_STATE = { fertig: 'Runde fertig', teil: 'geübt, Runde nicht fertig', aus: 'nicht geübt', frei: 'nichts fällig', offen: 'noch offen' };
+// Vorlese-Texte der Tagespunkte, gleich wie in Spell (Mission = der ganze Tag, Projektleitung 08.11.2026)
+const DAY_STATE = { fertig: 'Mission geschafft', teil: 'angefangen, Mission noch offen', aus: 'nicht geübt', frei: 'nichts fällig', offen: 'noch offen' };
 function planHTML(p) {
   const b = p.bericht, u = p.urteil;
   // Ohne Termin (pause) oder ohne Bericht (unbekannt) gibt es keine Ampel: neutral grau, nicht grün
