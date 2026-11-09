@@ -18,6 +18,8 @@
     hint  (optional) Zusatz unter dem deutschen Wort, wenn es mehrdeutig ist
     tip   (optional) Merktipp nach der Antwort
     syn   (optional) ids von Wörtern, die auch passen würden (gilt als „fast richtig“)
+    nohear (optional) true = nie als Hördiktat, weil es wie ein anderes Wort klingt (eye/I, sea/see, two/to)
+    bad   (optional) Formen, die falsch zählen, obwohl nur 1 Buchstabe fehlt (z. B. 'feets' – sonst wäre es „Fast!“)
     (apart pro Unit: Gruppen von ids, die nicht am selben Tag neu eingeführt werden)
 */
 window.UNITS = [
@@ -42,7 +44,7 @@ window.UNITS = [
       { id: 'u1b-and', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'and', de: 'und', ex: 'The parrot is blue [and] yellow.' },
       { id: 'u1b-yes', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'yes', de: 'ja', ex: 'Are you eleven? – [Yes], I am.' },
       { id: 'u1b-not', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'not', de: 'nicht', ex: "I'm [not] ten." },
-      { id: 'u1b-i', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'I', de: 'ich', ex: '[I] am eleven.', tip: 'I schreibt man immer groß – auch mitten im Satz.' },
+      { id: 'u1b-i', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'I', de: 'ich', ex: '[I] am eleven.', tip: 'I schreibt man immer groß – auch mitten im Satz.', nohear: true },
       { id: 'u1b-you', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'you', de: 'du; Sie; ihr', ex: 'Are [you] happy?' },
       { id: 'u1b-please', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'please', de: 'bitte', ex: 'Can you spell it, [please]?' },
       { id: 'u1b-thankyou', sec: 'S.11', grp: 'Wörter, die du schon kennst', en: 'thank you', de: 'danke', alt: ['thank you', 'thanks'] },
@@ -72,9 +74,9 @@ window.UNITS = [
 
       // ---- WB S. 11: Numbers ----
       { id: 'u1n-1', sec: 'S.11', grp: 'Numbers', en: 'one', de: '1', hint: 'als Wort' },
-      { id: 'u1n-2', sec: 'S.11', grp: 'Numbers', en: 'two', de: '2', hint: 'als Wort' },
+      { id: 'u1n-2', sec: 'S.11', grp: 'Numbers', en: 'two', de: '2', hint: 'als Wort', nohear: true },
       { id: 'u1n-3', sec: 'S.11', grp: 'Numbers', en: 'three', de: '3', hint: 'als Wort' },
-      { id: 'u1n-4', sec: 'S.11', grp: 'Numbers', en: 'four', de: '4', hint: 'als Wort' },
+      { id: 'u1n-4', sec: 'S.11', grp: 'Numbers', en: 'four', de: '4', hint: 'als Wort', nohear: true },
       { id: 'u1n-5', sec: 'S.11', grp: 'Numbers', en: 'five', de: '5', hint: 'als Wort' },
       { id: 'u1n-6', sec: 'S.11', grp: 'Numbers', en: 'six', de: '6', hint: 'als Wort' },
       { id: 'u1n-7', sec: 'S.11', grp: 'Numbers', en: 'seven', de: '7', hint: 'als Wort' },
@@ -155,7 +157,7 @@ window.UNITS = [
       { id: 'u1-more', sec: '1', en: 'more', de: 'mehr', ex: 'I want [more]!' },
       { id: 'u1-read', sec: '1', en: 'to read', de: 'lesen', ex: '[Read] the text.' },
 
-      { id: 'u1-their', sec: '2', en: 'their', de: 'ihr/e', hint: 'gehört mehreren Personen', ex: "What's [their] address?", tip: 'their = ihr/e, there = dort. Die beiden klingen gleich!' },
+      { id: 'u1-their', sec: '2', en: 'their', de: 'ihr/e', hint: 'gehört mehreren Personen', ex: "What's [their] address?", tip: 'their = ihr/e, there = dort. Die beiden klingen gleich!', nohear: true },
 
       { id: 'u1-ask', sec: '4', en: 'to ask', de: 'fragen', ex: 'Can I [ask] you a question?' },
       { id: 'u1-address', sec: '4', en: '(email) address', de: '(E-Mail-)Adresse', alt: ['address', 'email address', 'e-mail address'], main: 'email address', say: 'email address', ex: 'My email [address] is sara@linkways.com.', tip: 'Im Englischen mit dd und ss: a-dd-re-ss.' },
@@ -175,7 +177,7 @@ window.UNITS = [
       { id: 'u1-howmany', sec: '9', en: 'how many', de: 'wie viele', ex: '[How many] frogs can you see?' },
 
       { id: 'u1-hate', sec: '12', en: 'to hate', de: 'hassen, nicht ausstehen können', ex: 'I [hate] pink.', tip: 'Gegenteil: to love' },
-      { id: 'u1-here', sec: '12', en: 'here', de: 'hier', ex: "[Here]'s your pencil case.", tip: 'here = hier, hear = hören. Die beiden klingen gleich!' },
+      { id: 'u1-here', sec: '12', en: 'here', de: 'hier', ex: "[Here]'s your pencil case.", tip: 'here = hier, hear = hören. Die beiden klingen gleich!', nohear: true },
       { id: 'u1-it', sec: '12', en: 'it', de: 'es', ex: "[It]'s yellow.", tip: "It's ist die Kurzform von It is." },
       { id: 'u1-lets', sec: '12', en: "Let's …", de: 'Lass(t) …', hint: 'wie in: Lasst uns singen!', alt: ["let's"], main: "Let's", say: "Let's", ex: "[Let's] sing a song!", tip: "Let's = Let us. Den Apostroph nicht vergessen!" },
       { id: 'u1-midnight', sec: '12', en: 'midnight', de: 'Mitternacht', ex: "It's twelve o'clock – [midnight].", tip: 'Das gh spricht man nicht: mid-night.' },
@@ -223,7 +225,7 @@ window.UNITS = [
 
       { id: 'u2-beautiful', sec: '1', en: 'beautiful', de: 'schön, hübsch', ex: "The parrot is blue and yellow. It's [beautiful].", tip: 'Schwieriges Wort: b-e-a-u-t-i-f-u-l.' },
       { id: 'u2-behind', sec: '1', en: 'behind', de: 'hinter', ex: 'The chair is [behind] the desk.', tip: 'Gegenteil: in front of' },
-      { id: 'u2-big', sec: '1', en: 'big', de: 'groß', ex: "There's a [big] giraffe.", tip: 'Gegenteil: small' },
+      { id: 'u2-big', sec: '1', en: 'big', de: 'groß', hint: 'Tier oder Sache', ex: "There's a [big] giraffe.", tip: 'Gegenteil: small. Eine große Person ist tall.', syn: ['u3-tall'] },
       { id: 'u2-infrontof', sec: '1', en: 'in front of', de: 'vor', hint: 'Ort, z. B. vor dem Baum', ex: 'The tree is [in front of] you.', tip: 'Gegenteil: behind' },
       { id: 'u2-nextto', sec: '1', en: 'next to', de: 'neben', ex: 'The parrot is [next to] the monkeys.' },
       { id: 'u2-now', sec: '1', en: 'now', de: 'jetzt', ex: 'Where is it [now]?' },
@@ -235,7 +237,7 @@ window.UNITS = [
       { id: 'u2-whatisit', sec: '1', en: 'What is it?', de: 'Was ist los?', alt: ['what is it'] },
       { id: 'u2-where', sec: '1', en: 'where', de: 'wo', ex: '[Where] is it?' },
 
-      { id: 'u2-small', sec: '2', en: 'small', de: 'klein', ex: "The monkey isn't big. It's [small].", tip: 'Gegenteil: big' },
+      { id: 'u2-small', sec: '2', en: 'small', de: 'klein', hint: 'Tier oder Sache', ex: "The monkey isn't big. It's [small].", tip: 'Gegenteil: big. Eine kleine Person ist short.' },
 
       { id: 'u2-adult', sec: '4', en: 'adult', de: 'Erwachsene/r', ex: '[Adult]s are £14.40.' },
       { id: 'u2-at', sec: '4', en: 'at', de: 'bei; an; hier: in', hint: 'wie in: Die Kinder sind im Zoo.', ex: 'The children are [at] the zoo.' },
@@ -245,7 +247,7 @@ window.UNITS = [
       { id: 'u2-guide', sec: '4', en: 'guide', de: '(Reise-)Führer/in', ex: 'Listen to the [guide].' },
       { id: 'u2-runaround', sec: '4', en: 'to run around', de: 'herumlaufen', ex: "Dogs are welcome, but they can't [run around]." },
       { id: 'u2-train', sec: '4', en: 'train', de: 'Zug', ex: "Let's go on a [train]." },
-      { id: 'u2-to', sec: '4', en: 'to', de: 'zu; bis; vor; hier: in', hint: 'wie in: Willkommen im Wildpark!', ex: 'Welcome [to] the wildlife park!' },
+      { id: 'u2-to', sec: '4', en: 'to', de: 'zu; bis; vor; hier: in', hint: 'wie in: Willkommen im Wildpark!', ex: 'Welcome [to] the wildlife park!', nohear: true },
       { id: 'u2-welcome', sec: '4', en: 'welcome', de: 'willkommen', ex: '[Welcome] to London.' },
 
       { id: 'u2-from', sec: '6', en: 'from', de: 'aus', ex: 'They are [from] California.' },
@@ -257,7 +259,7 @@ window.UNITS = [
       { id: 'u2-they', sec: '7', en: 'they', de: 'sie', hint: 'mehrere', ex: 'Rahim and Sue are 11. [They] are from Manchester.' },
       { id: 'u2-we', sec: '7', en: 'we', de: 'wir', ex: "[We]'re Sophie and John." },
 
-      { id: 'u2-for', sec: '9', en: 'for', de: 'für', ex: "Here's a chant [for] you." },
+      { id: 'u2-for', sec: '9', en: 'for', de: 'für', ex: "Here's a chant [for] you.", nohear: true },
       { id: 'u2-happy', sec: '9', en: 'happy', de: 'glücklich, fröhlich; zufrieden', ex: 'Buddy is [happy].' },
       { id: 'u2-letout', sec: '9', en: 'to let somebody out', de: 'jemanden herauslassen', alt: ['to let somebody out', 'to let someone out'], ex: '[Let] us out!' },
       { id: 'u2-us', sec: '9', en: 'us', de: 'uns', ex: 'Can you see [us]?' },
@@ -268,6 +270,55 @@ window.UNITS = [
       { id: 'u2-strange', sec: 'S1', en: 'How strange!', de: 'Wie komisch!', alt: ['how strange'] },
       { id: 'u2-letmesee', sec: 'S1', en: 'Let me see.', de: 'Lass mich mal schauen.', alt: ['let me see'] },
       { id: 'u2-stone', sec: 'S1', en: 'stone', de: 'Stein', ex: 'Colour your [stone].' }
+    ]
+  },
+  {
+    id: 'u3',
+    title: 'Unit 3',
+    source: 'WB Seite 22–23',
+    // Nie am selben Tag neu: Einzahl/Mehrzahl und Reimpaare (foot/tooth, feet/teeth), ear/eye, Gegensätze, die zwei short
+    apart: [
+      ['u3-tooth', 'u3-teeth'],
+      ['u3-foot', 'u3-feet'],
+      ['u3-teeth', 'u3-feet'],
+      ['u3-tooth', 'u3-foot'],
+      ['u3-ear', 'u3-eye'],
+      ['u3-tall', 'u3-short'],
+      ['u3-long', 'u3-shorthair'],
+      ['u3-short', 'u3-shorthair'],
+      ['u3-tall', 'u3-long']
+    ],
+    words: [
+      // ---- WB S. 22, Üb. 1: Parts of the body (Wortgitter: leg + 12 Wörter; hier von Kopf bis Fuß) ----
+      { id: 'u3-hair', sec: 'S.22', grp: 'Parts of the body', en: 'hair', de: 'Haare', bad: ['hairs'], ex: 'My [hair] is brown.', tip: 'hair heißt schon „Haare“ – ohne s: My hair is brown.' },
+      { id: 'u3-ear', sec: 'S.22', grp: 'Parts of the body', en: 'ear', de: 'Ohr', ex: 'The parrot is next to my [ear].', tip: 'In hear (hören) steckt ear (Ohr).' },
+      { id: 'u3-eye', sec: 'S.22', grp: 'Parts of the body', en: 'eye', de: 'Auge', ex: 'Close your [eye]s.', tip: 'e-y-e: vorne und hinten ein e. Es klingt wie I.', nohear: true },
+      { id: 'u3-nose', sec: 'S.22', grp: 'Parts of the body', en: 'nose', de: 'Nase', ex: 'Look! The frog is on my [nose].', tip: 'Mit e am Ende: nose.' },
+      { id: 'u3-mouth', sec: 'S.22', grp: 'Parts of the body', en: 'mouth', de: 'Mund', ex: 'Open your [mouth], please.', tip: 'mouth (Mund) endet mit th – mouse ist die Maus.' },
+      { id: 'u3-tooth', sec: 'S.22', grp: 'Parts of the body', en: 'tooth', de: 'Zahn', ex: "Look! There's a [tooth] on my desk.", tip: 'Mehrzahl: teeth – aus oo wird ee.' },
+      { id: 'u3-teeth', sec: 'S.22', grp: 'Parts of the body', en: 'teeth', de: 'Zähne', bad: ['teeths'], ex: 'Clean your [teeth].', tip: 'Einzahl: tooth. teeth ist schon die Mehrzahl – kein s dazu.' },
+      { id: 'u3-beard', sec: 'S.22', grp: 'Parts of the body', en: 'beard', de: 'Bart', ex: 'The [beard] is black.', tip: 'In beard steckt bear (Bär) + d.' },
+      { id: 'u3-shoulder', sec: 'S.22', grp: 'Parts of the body', en: 'shoulder', de: 'Schulter', ex: 'The parrot is on my [shoulder].', tip: 'sh-ou-l-d-e-r: mit ou und mit d.' },
+      { id: 'u3-arm', sec: 'S.22', grp: 'Parts of the body', en: 'arm', de: 'Arm', ex: 'The monkey is on my [arm].', tip: 'Wie im Deutschen, aber klein geschrieben: arm.' },
+      { id: 'u3-leg', sec: 'S.22', grp: 'Parts of the body', en: 'leg', de: 'Bein', ex: 'The dog is next to my [leg].' },
+      { id: 'u3-foot', sec: 'S.22', grp: 'Parts of the body', en: 'foot', de: 'Fuß', ex: 'My [foot] is in the shoe.', tip: 'Mehrzahl: feet – aus oo wird ee, wie bei tooth – teeth.' },
+      { id: 'u3-feet', sec: 'S.22', grp: 'Parts of the body', en: 'feet', de: 'Füße', bad: ['feets'], ex: 'My socks are on my [feet].', tip: 'Einzahl: foot. feet ist schon die Mehrzahl – kein s dazu.' },
+      // fingers: nur in Üb. 4 (S. 23), nicht im Wortgitter
+      { id: 'u3-finger', sec: 'S.23', grp: 'Parts of the body', en: 'finger', de: 'Finger', alt: ['finger', 'fingers'], ex: 'How many [finger]s can you see?', tip: 'Wie im Deutschen, aber klein geschrieben: finger.' },
+
+      // ---- WB S. 22, Üb. 2: Pirates (Wortschlange; Reihenfolge wie die Nummern im Bild 1–6) ----
+      { id: 'u3-pirate', sec: 'S.22', grp: 'Pirates', en: 'pirate', de: 'Pirat/in', ex: 'The [pirate] is on the ship.', tip: 'Mit e am Ende: pirate.' },
+      { id: 'u3-hook', sec: 'S.22', grp: 'Pirates', en: 'hook', de: 'Haken', ex: 'The [hook] is grey.', tip: 'oo wie in book: hook.' },
+      { id: 'u3-sea', sec: 'S.22', grp: 'Pirates', en: 'sea', de: 'Meer', ex: 'There are many fish in the [sea].', tip: 'sea (Meer) klingt genauso wie see (sehen).', nohear: true },
+      { id: 'u3-woodenleg', sec: 'S.22', grp: 'Pirates', en: 'wooden leg', de: 'Holzbein', ex: 'The [wooden leg] is brown.', tip: 'Zwei Wörter: wooden (aus Holz) + leg (Bein).' },
+      { id: 'u3-treasure', sec: 'S.22', grp: 'Pirates', en: 'treasure', de: 'Schatz', ex: 'The [treasure] is under the tree.', tip: 'Schwieriges Wort: t-r-e-a-s-u-r-e.' },
+      { id: 'u3-ship', sec: 'S.22', grp: 'Pirates', en: 'ship', de: 'Schiff', ex: 'The pirates are on the [ship].', tip: 'ship (Schiff) mit i – sheep (Schaf) mit ee.' },
+
+      // ---- WB S. 23, Üb. 3 und 5: big, small, tall, short, long, short (big und small: siehe Unit 2) ----
+      { id: 'u3-tall', sec: 'S.23', grp: 'Tall or short?', en: 'tall', de: 'groß', hint: 'Person', ex: 'The pirate is [tall].', tip: 'Eine große Person ist tall, ein großes Tier big. Gegenteil: short.' },
+      { id: 'u3-short', sec: 'S.23', grp: 'Tall or short?', en: 'short', de: 'klein', hint: 'Person', ex: "The pirate isn't tall. He's [short].", tip: 'Eine kleine Person ist short, ein kleines Tier small. Gegenteil: tall.' },
+      { id: 'u3-long', sec: 'S.23', grp: 'Tall or short?', en: 'long', de: 'lang', ex: 'The beard is [long].', tip: 'Haare und Bart sind long – eine große Person ist tall. Gegenteil: short.' },
+      { id: 'u3-shorthair', sec: 'S.23', grp: 'Tall or short?', en: 'short', de: 'kurz', ex: 'My hair is [short].', tip: 'Gegenteil: long. short heißt auch klein – bei einer Person.' }
     ]
   }
 ];

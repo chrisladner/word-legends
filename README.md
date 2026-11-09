@@ -21,10 +21,10 @@ einmal geöffnet wurde.
 | Verteilte Wiederholung | Stufen 1–5 + Legendär, Pausen 1 · 2 · 4 · 7 · 14 · 30 Tage (Legendär und richtig: 60) |
 | Einmal pro Tag zählt | Nur der erste Versuch einer geladenen Karte ändert die Stufe |
 | Fehler | −2 Stufen (mind. 1), morgen wieder. Tippfehler oder Tipp benutzt: Stufe bleibt, morgen wieder |
-| Wie im Test | Hauptaufgabe Deutsch → Englisch tippen, Autokorrektur aus, 1 Buchstabe daneben = „Fast!“ |
+| Wie im Test | Hauptaufgabe Deutsch → Englisch tippen, Autokorrektur aus, 1 Buchstabe daneben = „Fast!“ (außer Formen in `bad`, z. B. feets). Verwechselt mit einem anderen Wort der Liste: „Verwechselt!“ mit dessen Bedeutung und `hint` |
 | Ausbessern | Nach Fehlern einmal richtig abschreiben, Wort kommt in derselben Runde nochmal |
-| Neue Wörter | erst abfragen („Kennst du das schon?“): gekonnt → startet auf Stufe 2 (Schularbeit: 3). Sonst Karte ansehen + anhören → verdeckt tippen → Multiple Choice → tippen |
-| Abfragearten | Stufe 1: tippen · Stufe 2: tippen/Lückensatz · ab 3: tippen/Lückensatz/Hördiktat |
+| Neue Wörter | erst abfragen („Kennst du das schon?“): gekonnt → startet auf Stufe 2 (Schularbeit: 3). Sonst Karte ansehen + anhören → verdeckt tippen → Multiple Choice (Ablenker nie mit gleichem Deutsch, gleichem Englisch wie short = klein/kurz oder `syn`) → tippen |
+| Abfragearten | Stufe 1: tippen · Stufe 2: tippen/Lückensatz · ab 3: tippen/Lückensatz/Hördiktat (nicht bei Wörtern mit `nohear`, die wie ein anderes klingen: eye/I, two/to …) |
 | Portionen | 8 neue pro Tag (einstellbar), `apart`-Gruppen (open/close …) nie am selben Tag |
 | Mehrere Units | neueste Unit hat Vorrang, ältere werden eingestreut (max. 6 pro Tag), siehe unten |
 | Testdatum | Neue Wörter werden bis 2 Tage vorher verteilt, am Tag vor dem Test sind alle Karten fällig. Der offizielle Termin (`exam.js`) geht vor und ist gesperrt; ein eigenes Datum gilt nur ohne offiziellen |
@@ -72,7 +72,7 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v8`; die Version steht auch im
+Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v9`; die Version steht auch im
 Lagebericht und in der Sicherung), und neu veröffentlichen.
 
 So kommt ein Update aufs iPhone (seit `wl-v5`): Mit Internet holt der Offline-Cache die App-Dateien
@@ -80,7 +80,7 @@ immer frisch vom Server (höchstens 2,5 s warten, sonst Cache). Ein neuer `VERSI
 und beim Zurückholen aus dem Hintergrund gefunden; die App lädt dann von selbst neu, sobald man auf der
 Startseite ist, nie mitten in einer Runde. Kommt das Update von `wl-v1`…`wl-v4` (diese Seiten konnten
 sich noch nicht selbst neu laden), lädt der neue Offline-Cache das offene Fenster einmal neu (`LEGACY`).
-Welche Version am Handy läuft, steht unten in den Einstellungen („Version 8“).
+Welche Version am Handy läuft, steht unten in den Einstellungen („Version 9“).
 
 ## Eltern-Verbindung und Plan-Karte (seit `wl-v6`)
 
@@ -123,6 +123,9 @@ Sobald es mehr als eine Unit gibt, gilt (Einstellungen → „Schwerpunkt“, St
 „Alle Units gleich“ schaltet den Vorrang ab, z. B. vor einer Schularbeit über mehrere Units.
 Mit nur einer Unit ist davon nichts sichtbar. Getestet mit einer erfundenen Unit 2 über 25 simulierte Tage:
 nie mehr als 6 alte Karten pro Tag, ein Rückstau von 20 fälligen Karten war nach etwa einer Woche abgebaut.
+Achtung (Lernforschung, 09.11.2026): Nach einer Schularbeit mit Endspurt werden viele alte Karten fast gleichzeitig
+fällig (nach dem 05.11.2026 rund 200 von 271). Mit 6 pro Tag baut sich dieser Rückstau nicht ab. Vorschlag: ab dem
+18.11.2026 alte Karten bis 35 Wiederholungen pro Mission auffüllen (`MISSION_FILL`), noch nicht gebaut.
 
 ## Dateien
 

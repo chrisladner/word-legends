@@ -15,7 +15,7 @@ const TIER_SHORT = ['Neu', '1', '2', '3', '4', '5', '👑'];
 const XP = { type: 10, memo: 5, mc: 5, intro: 5, noTo: 8, hint: 4, typo: 3, levelUp: 5, combo: 10, mission: 20 };
 const OLD_PER_DAY = 6;   // so viele Karten aus älteren Units werden pro Tag höchstens eingestreut
 const TITLES = [[1, 'Rookie'], [4, 'Wortjäger'], [8, 'Vokabel-Profi'], [14, 'Sprach-Ninja'], [22, 'Word Legend']];
-const VERSION = 'wl-v8';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
+const VERSION = 'wl-v9';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
 
 // Gemeinsame Bausteine von Legends HQ (legends-status.js, legends-sync.js). Fehlen sie, z. B. nach einem halben
 // Update ohne Netz, läuft die App wie bisher – nur ohne Plan-Karte und Eltern-Verbindung.
@@ -159,6 +159,8 @@ function check(w, input, kind) {
   if (syn) return { res: 'typo', near: norm(w.main), syn };
   const other = WORDS.find(o => o !== w && (o.accept.has(n) || o.acceptNoTo.has(n)));
   if (other) return { res: 'wrong', confused: other };
+  // Falsche Mehrzahl wie feets ist kein Tippfehler, sondern falsch (Feld bad in words.js)
+  if ((w.bad || []).some(b => norm(b) === n)) return { res: 'wrong' };
   let best = Infinity, near = '';
   for (const a of [...acc, ...accNoTo]) {
     const d = dist(n, a);
@@ -548,7 +550,7 @@ function reviewType(w, lv) {
   const listen = S.settings.autoSpeak && TTS.ok;
   if (lv <= 1) return 'type';
   if (lv === 2) return cloze && r < 0.45 ? 'cloze' : 'type';
-  if (listen && r < 0.25) return 'listen';
+  if (listen && !w.nohear && r < 0.25) return 'listen';   // nohear: klingt wie ein anderes Wort (eye/I)
   if (cloze && r < 0.55) return 'cloze';
   return 'type';
 }
@@ -821,9 +823,18 @@ function checkCaseText(text, items) {
   return res;
 }
 
-// Ablenker fürs Auswählen: am liebsten aus derselben Gruppe (Zahlen zu Zahlen, Farben zu Farben)
+// Deutsch mit Hinweis in Klammern (schon escaped), z. B. „klein (Person)“ – Satzzeichen am Ende des Hinweises weg
+function deHint(w) {
+  const h = (w.hint || '').replace(/[.!?]+$/, '');
+  return esc(w.de) + (h ? ` (${esc(h)})` : '');
+}
+
+// Ablenker fürs Auswählen: am liebsten aus derselben Gruppe (Zahlen zu Zahlen, Farben zu Farben).
+// Nie ein Wort, das auch stimmen würde: gleiches Deutsch, gleiches Englisch (short = klein / kurz) oder syn.
 function distractors(w, k) {
-  const pool = WORDS.filter(o => o !== w && o.de !== w.de);
+  const sameEnDe = new Set(WORDS.filter(x => norm(x.en) === norm(w.en)).map(x => x.de));
+  const pool = WORDS.filter(o => o !== w && !sameEnDe.has(o.de) && norm(o.en) !== norm(w.en)
+    && !(w.syn || []).includes(o.id) && !(o.syn || []).includes(w.id));
   const same = shuffle(pool.filter(o => w.grp && o.grp === w.grp));
   const kind = shuffle(pool.filter(o => o.verb === w.verb && !(w.grp && o.grp === w.grp)));
   const rest = shuffle(pool.filter(o => o.verb !== w.verb));
@@ -1383,7 +1394,7 @@ function miniCardBtn(w, showUnit) {
   return `<button class="mcard ${lv ? '' : 'unseen'}" type="button" data-act="card" data-id="${w.id}" style="--tier:var(--t${lv})">
     <span class="mband ${lv === 6 ? 'holo' : ''}">${lv ? (lv === 6 ? '👑 Legendär' : 'Stufe ' + lv) : 'Neu'}${showUnit ? ` · ${esc(unitTitle(w.unit))}` : ''}</span>
     <b class="men">${esc(w.en)}</b>
-    <span class="mde">${esc(w.de)}</span>
+    <span class="mde">${deHint(w)}</span>
     <span class="mstate">${cardState(w)}</span>
   </button>`;
 }
@@ -1397,7 +1408,7 @@ function cardDetail(id) {
       ${tierBand(lv)}
       <div class="cbody">
         <div class="row"><div class="en">${esc(w.en)}</div>${sayBtn(w)}</div>
-        <div class="de">${esc(w.de)}</div>
+        <div class="de">${deHint(w)}</div>
         ${w.exPlain ? `<p class="ex">${exHTML(w)}</p>` : ''}
         ${w.tip ? `<p class="tip">💡 ${esc(w.tip)}</p>` : ''}
         ${stats}
@@ -1459,7 +1470,7 @@ function testResult(s) {
         const w = BY_ID[r.id];
         const mark = r.pts === 1 ? '✓' : r.pts > 0 ? '½' : '✗';
         const cls = r.pts === 1 ? 'good' : r.pts > 0 ? 'almost' : 'bad';
-        return `<div class="rrow ${cls}"><span class="rmark">${mark}</span><span class="rde">${esc(w.de)}</span><span class="ren">${esc(w.en)}${r.pts < 1 ? `<small>${r.input ? 'du: ' + esc(r.input) : 'leer gelassen'}</small>` : ''}</span></div>`;
+        return `<div class="rrow ${cls}"><span class="rmark">${mark}</span><span class="rde">${deHint(w)}</span><span class="ren">${esc(w.en)}${r.pts < 1 ? `<small>${r.input ? 'du: ' + esc(r.input) : 'leer gelassen'}</small>` : ''}</span></div>`;
       }).join('')}
     </div>
     ${misses.length ? `<button class="btn go big" type="button" data-act="trainMisses">Fehler üben (${misses.length})</button>` : ''}
@@ -1977,7 +1988,7 @@ function showWord(t, w) {
       chip = t.fromProbe ? 'Neu für dich – schau dir die Schreibweise an' : 'Schau dir die Schreibweise genau an';
       band = `<div class="band new"><span>Neue Karte</span><span>✦</span></div>`;
       body = `<div class="row"><div class="en">${esc(w.en)}</div>${sayBtn(w)}</div>
-        <div class="de">${esc(w.de)}</div>
+        <div class="de">${deHint(w)}</div>
         ${w.exPlain ? `<p class="ex">${exHTML(w)}</p>` : ''}
         ${w.tip ? `<p class="tip">💡 ${esc(w.tip)}</p>` : ''}`;
       kind = 'next';
@@ -2396,12 +2407,12 @@ function feedback(res, info, sched, xp) {
   const cls = good ? 'good' : res === 'typo' ? 'almost' : 'bad';
   let body = '';
   if (t.type === 'cloze') body += `<p class="ex big">${exHTML(w)}</p>`;
-  body += `<div class="pair"><div class="pair-txt"><span class="de">${esc(w.de)}</span><span class="en sm">${esc(w.en)}</span></div>${sayBtn(w)}</div>`;
+  body += `<div class="pair"><div class="pair-txt"><span class="de">${deHint(w)}</span><span class="en sm">${esc(w.en)}</span></div>${sayBtn(w)}</div>`;
   const typedVal = (info.input || '').trim();
   if (res === 'typo' && !r.syn) body += `<div class="yours">Du: <s>${esc(typedVal)}</s> · richtig: <span class="fix">${diffMark(typedVal, r.near)}</span></div>`;
   else if ((res === 'wrong' || r.syn) && typedVal && !info.idk) body += `<div class="yours">Du: <s>${esc(typedVal)}</s></div>`;
   if (r.syn) body += `<p class="note">${esc(r.syn.en)} passt auch – gesucht ist aber <b>${esc(w.en)}</b>.</p>`;
-  if (r.confused) body += `<p class="note">${esc(r.confused.en)} heißt „${esc(r.confused.de)}“.</p>`;
+  if (r.confused) body += `<p class="note">${esc(r.confused.en)} heißt „${deHint(r.confused)}“.</p>`;
   if (res === 'noTo') body += `<p class="note">Bei Verben gehört das <b>to</b> dazu: <b>${esc(w.en)}</b></p>`;
   if (info.known) body += `<p class="sched up">⚡ Die Karte startet gleich auf Stufe ${S.w[t.id].lv}.</p>`;
   if (t.type !== 'cloze' && w.exPlain) body += `<p class="ex">${exHTML(w)}</p>`;
