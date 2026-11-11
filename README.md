@@ -72,8 +72,11 @@ Bei Grammatik zählt jeder Buchstabe (babys statt babies ist falsch), nur ein ve
 In `words.js` einen weiteren Block an `window.UNITS` anhängen (Format steht oben in der Datei).
 Einfachster Weg: Foto der Vokabelseite an Claude schicken („neue Unit für Word Legends“).
 ids nie ändern oder wiederverwenden, sonst geht der Fortschritt verloren.
-Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v9`; die Version steht auch im
-Lagebericht und in der Sicherung), und neu veröffentlichen.
+Danach `VERSION` hochzählen, in `sw.js` **und** oben in `app.js` (Stand `wl-v11`; die Version steht auch im
+Lagebericht und in der Sicherung), und neu veröffentlichen. `wl-v11` (11.11.2026) bringt nur die neue Kopie von
+`legends-status.js` (Legends HQ `hq-v5`: Leseblatt und Probe-Schularbeit von Spell Legends); Berichte und Ampel von
+Word Legends bleiben Zeichen für Zeichen gleich. Die Nummer `wl-v10` ist für das Auffüllen alter Units vergeben
+(gebaut, noch nicht veröffentlicht) und in `wl-v11` nicht enthalten.
 
 So kommt ein Update aufs iPhone (seit `wl-v5`): Mit Internet holt der Offline-Cache die App-Dateien
 immer frisch vom Server (höchstens 2,5 s warten, sonst Cache). Ein neuer `VERSION`-Stand wird beim Öffnen

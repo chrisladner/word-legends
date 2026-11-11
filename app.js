@@ -15,7 +15,7 @@ const TIER_SHORT = ['Neu', '1', '2', '3', '4', '5', '👑'];
 const XP = { type: 10, memo: 5, mc: 5, intro: 5, noTo: 8, hint: 4, typo: 3, levelUp: 5, combo: 10, mission: 20 };
 const OLD_PER_DAY = 6;   // so viele Karten aus älteren Units werden pro Tag höchstens eingestreut
 const TITLES = [[1, 'Rookie'], [4, 'Wortjäger'], [8, 'Vokabel-Profi'], [14, 'Sprach-Ninja'], [22, 'Word Legend']];
-const VERSION = 'wl-v9';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
+const VERSION = 'wl-v11';   // wie VERSION in sw.js – immer beide zusammen hochzählen (steht im Lagebericht und in der Sicherung)
 
 // Gemeinsame Bausteine von Legends HQ (legends-status.js, legends-sync.js). Fehlen sie, z. B. nach einem halben
 // Update ohne Netz, läuft die App wie bisher – nur ohne Plan-Karte und Eltern-Verbindung.
